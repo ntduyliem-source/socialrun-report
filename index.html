@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f6f3">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://raw.githubusercontent.com; img-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="description" content="Theo dõi tiến độ SocialRun theo ngày, trên điện thoại.">
+  <title>SocialRun · Report</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="./" aria-label="SocialRun Report"><span class="brand-icon" aria-hidden="true">S<span>↗</span></span><span>SocialRun <small>REPORT</small></span></a><span class="view-only"><span aria-hidden="true">◉</span> Chỉ xem</span></header>
+  <main>
+    <section class="page-heading"><div><p class="eyebrow">THEO DÕI VẬN HÀNH</p><h1>Nhật ký công việc<span class="heading-dot">.</span></h1><p class="intro">Tiến độ từng nhân viên. Kết quả từng lượt chạy.</p></div><button id="refresh" class="refresh" type="button"><span aria-hidden="true">↻</span> Làm mới</button></section>
+    <div id="sync" class="sync" role="status" aria-live="polite"><span class="sync-dot"></span><span>Đang tải report…</span></div>
+    <section class="toolbar" aria-label="Chọn ngày và múi giờ"><label class="date-control">Ngày lịch<select id="day" aria-label="Ngày lịch"></select></label><label class="timezone-control">Giờ hiển thị<select id="timezone" aria-label="Múi giờ"><option value="Asia/Ho_Chi_Minh">Việt Nam · UTC+7</option><option value="America/Halifax">Máy chạy · Halifax</option></select></label></section>
+    <div id="error" class="error" role="alert" hidden></div>
+    <section id="summary" class="summary" aria-label="Tổng quan"></section>
+    <section class="section"><div class="section-heading"><h2>Nhân viên <span id="employee-count" class="count"></span></h2><span class="section-note">Theo ngày lịch đã chọn</span></div><div id="employees" class="employees"><div class="loading">Đang lấy tiến độ…</div></div></section>
+    <section class="section log-section"><div class="section-heading"><h2>Nhật ký <span id="log-count" class="count"></span></h2><button id="clear" class="text-button" type="button" hidden>Xóa bộ lọc</button></div><div class="filters"><label class="sr-only" for="employee">Lọc nhân viên</label><select id="employee"><option value="">Mọi nhân viên</option></select><label class="sr-only" for="group">Lọc group hoặc nơi đăng</label><select id="group"><option value="">Mọi nơi đăng</option></select></div><div id="status-filters" class="status-filters" role="group" aria-label="Lọc trạng thái"><button type="button" data-filter="all" class="active" aria-pressed="true">Tất cả</button><button type="button" data-filter="done" aria-pressed="false">Đã xác nhận</button><button type="button" data-filter="waiting" aria-pressed="false">Chưa xong</button><button type="button" data-filter="attention" aria-pressed="false">Cần xử lý</button></div><div id="log" class="log"></div></section>
+    <footer><span class="footer-brand">SocialRun <span>↗</span></span><p>Ngày lịch theo máy chạy; giờ từng lượt theo múi giờ đã chọn.<br>Report tự làm mới mỗi 30 giây. Kết quả mới có thể trễ vài phút do bộ nhớ đệm GitHub.</p><span id="snapshot-time"></span></footer>
+  </main>
+</body>
+</html>
