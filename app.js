@@ -1,7 +1,7 @@
 import {LABELS,PLAN_LABELS,ATTENTION,confirmed,tasksFor,summary,filtered,tone} from './model.js';
 const $=id=>document.getElementById(id), escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let report=null,config=null,busy=false,filter='all',fetchFailed=false;
-try { $('timezone').value=localStorage.getItem('socialrun-report-timezone')||'Asia/Ho_Chi_Minh'; } catch {}
+try { const saved=localStorage.getItem('socialrun-report-timezone');$('timezone').value=['Asia/Ho_Chi_Minh','America/Halifax'].includes(saved)?saved:'Asia/Ho_Chi_Minh'; } catch {}
 const zone=()=>$('timezone').value, fmt=(at,options={})=>at?new Intl.DateTimeFormat('vi-VN',{timeZone:zone(),...options}).format(new Date(at)):'—';
 const clock=at=>fmt(at,{hour:'2-digit',minute:'2-digit',hourCycle:'h23'}), date=at=>fmt(at,{day:'2-digit',month:'2-digit'}), full=at=>fmt(at,{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 const n=value=>Number(value||0).toLocaleString('vi-VN'), badge=state=>`<span class="badge ${tone(state)}">${escape(LABELS[state]||state)}</span>`;
@@ -20,7 +20,7 @@ function syncStatus() {
 }
 function metric(label,value,hint,extra='') {return `<div class="metric ${extra}"><div class="metric-label">${label}</div><div class="metric-number">${value}</div><div class="metric-hint">${hint}</div></div>`;}
 function renderEmployees(day) {
-  const employees=day?.employees??[];
+  const employees=[...(day?.employees??[])].sort((a,b)=>(a.tasks[0]?.scheduledAt||'').localeCompare(b.tasks[0]?.scheduledAt||'')||a.employee.localeCompare(b.employee));
   $('employee-count').textContent=n(employees.length);
   $('employees').innerHTML=employees.length?employees.map(employee=>{
     const stats=summary(employee.tasks),roles=[...new Set(employee.tasks.map(t=>t.role))],next=employee.tasks.find(t=>t.state==='running')||employee.tasks.find(t=>t.state==='pending'),initials=employee.employee.split(/\s+/).filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase();
