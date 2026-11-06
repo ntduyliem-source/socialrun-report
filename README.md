@@ -7,7 +7,7 @@ SocialRun repository, database and diagnostics stay private.
 
 Deploy only these files to the dedicated public report repo's `main` branch:
 `index.html`, `app.js`, `model.js`, `style.css`, `icon.svg`, `config.json`,
-`.socialrun-report.json`, `.nojekyll`, `robots.txt`. Enable GitHub Pages from
+`theme.js`, `theme.css`, `.socialrun-report.json`, `.nojekyll`, `robots.txt`. Enable GitHub Pages from
 `main:/`. No dependencies or build step are needed.
 
 The `data` branch contains only `report.json`. `config.json` points the viewer
@@ -45,6 +45,9 @@ report remains viewable when the local machine/API is off.
 Days refer to the schedule's work date, including tasks crossing Vietnam
 midnight. The default display timezone is Vietnam; Halifax is also available.
 All rows for the selected day remain visible; filters never paginate the list.
+The sun/moon button switches light/dark appearance and remembers the choice on
+that device. First visits follow the phone's system appearance. The palette is
+set before the page paints, including the mobile browser toolbar color.
 GitHub Pages and the report repository are public even though search indexing
 is discouraged. There is no login or access-code protection.
 
@@ -54,3 +57,6 @@ is discouraged. There is no login or access-code protection.
 Backend tests cover credential omission, receipts, sampled invitations, publication
 history, retry/restart, and enabling/disabling. Local browser QA should check a
 375px phone viewport, date/timezone/employee/status filters, details and post links.
+
+To publish static changes, run `python scripts/deploy_report_site.py --message "Describe change"`.
+The deployer verifies the public report marker and copies only listed assets.
