@@ -13,9 +13,9 @@ function setOptions(el,items,defaultLabel) {
 }
 function syncStatus() {
   if(!report)return;
-  const age=Math.max(0,(Date.now()-new Date(report.generatedAt).getTime())/1000),stale=age>(report.staleAfterSeconds||900),el=$('sync');
+  const age=Math.max(0,(Date.now()-new Date(report.generatedAt).getTime())/1000),stale=age>(report.staleAfterSeconds||900)||report.sourceOnline===false,el=$('sync');
   el.className=`sync ${stale||fetchFailed?'stale':'live'}`;
-  el.innerHTML=`<span class="sync-dot"></span><span>${stale?'Đã lâu chưa có bản cập nhật':fetchFailed?'Đang giữ bản cập nhật gần nhất':'Đã đồng bộ'} · ${escape(full(report.generatedAt))}${age>60?` · ${n(Math.floor(age/60))} phút trước`:''}</span>`;
+  el.innerHTML=`<span class="sync-dot"></span><span>${report.sourceOnline===false?'SocialRun đang tắt; giữ kết quả gần nhất':stale?'Đã lâu chưa có bản cập nhật':fetchFailed?'Đang giữ bản cập nhật gần nhất':'Đã đồng bộ'} · ${escape(full(report.generatedAt))}${age>60?` · ${n(Math.floor(age/60))} phút trước`:''}</span>`;
   $('snapshot-time').textContent=`Bản cập nhật ${full(report.generatedAt)}`;
 }
 function metric(label,value,hint,extra='') {return `<div class="metric ${extra}"><div class="metric-label">${label}</div><div class="metric-number">${value}</div><div class="metric-hint">${hint}</div></div>`;}

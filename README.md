@@ -30,6 +30,12 @@ and the dashboard client header. The target must be public and have the marker.
 The data branch/file must already exist. The data publisher retries a failed sync
 after a minute; it never retries a Facebook action. Disable in dashboard Settings.
 
+For an older API that cannot be interrupted, start
+`python scripts/publish_online_report.py --watch --enable --repository owner/report`
+as a hidden background process. This uses the same exporter/config. A file lease
+prevents overlapping writers, and the helper exits once a new API's publisher is
+available. The helper reports API availability separately from its own heartbeat.
+
 Changed results upload at most once a minute; unchanged snapshots get a heartbeat
 every five minutes. The site polls every 30 seconds and reports the original
 generation time; raw GitHub caching can delay visibility by several minutes.
