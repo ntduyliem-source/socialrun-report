@@ -79,8 +79,28 @@
 [data-theme="dark"] footer { color: #a6b59d; }
 [data-theme="dark"] .footer-brand { color: #c1d2b4; }
 
+.report-tabs { display: flex; gap: 4px; margin-top: 22px; width: fit-content; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.report-tabs button { padding: 7px 14px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; }
+.report-tabs button[aria-pressed="true"] { border-color: var(--line); background: color-mix(in srgb, var(--green) 11%, var(--paper)); color: var(--green); font-weight: 650; }
+.report-tabs + .toolbar { margin-top: 16px; }
+.report-run-label, .zazzle-run-state { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: 12px; }
+.report-run-label select { max-width: min(260px, 62vw); }
+.zazzle-run-state { justify-content: space-between; }
+.zazzle-run-state strong { color: var(--green); }
+.zazzle-figures { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.zazzle-figures .metric-number { overflow-wrap: anywhere; font-size: clamp(17px, 2.7vw, 28px); }
+.report-table { overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.report-table table { border-collapse: collapse; width: 100%; font-size: 12px; text-align: left; font-variant-numeric: tabular-nums; }
+.report-table :is(th,td) { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.report-table thead th { color: var(--muted); }
+.report-table tbody tr:last-child :is(th,td) { border-bottom: 0; }
+
 @media (max-width: 540px) {
   .header-actions { gap: 8px; }
   .theme-toggle { width: 36px; height: 36px; border-radius: 9px; }
   .theme-toggle svg { width: 17px; height: 17px; }
+  .zazzle-run-heading { align-items: flex-start; flex-direction: column; }
+  .zazzle-figures .metric { padding: 12px 9px; }
+  .report-table table { font-size: 11px; }
+  .report-table :is(th,td) { padding: 9px; }
 }
