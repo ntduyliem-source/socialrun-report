@@ -1,4 +1,4 @@
-import {LABELS,PLAN_LABELS,tasksFor,summary,filtered,tone,ZAZZLE_ACTIONS,ZAZZLE_STATES,zazzlePeriod,zazzleProgress,zazzleRuns} from './model.js';
+import {LABELS,PLAN_LABELS,tasksFor,summary,filtered,tone,ZAZZLE_STATES,zazzlePeriod} from './model.js?v=2';
 const $=id=>document.getElementById(id), escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let report=null,config=null,busy=false,filter='all',fetchFailed=false;
 try { const saved=localStorage.getItem('socialrun-report-timezone');$('timezone').value=['Asia/Ho_Chi_Minh','America/Halifax'].includes(saved)?saved:'Asia/Ho_Chi_Minh'; } catch {}
@@ -50,7 +50,7 @@ function publicAmounts(amounts, covered, unknown = 0) {
   return escape(amounts.length ? amounts.map(row => reportCurrency(row.cents, row.currency)).join(' · ') :
     covered && !unknown ? reportCurrency(0, 'USD') : '—');
 }
-function renderZazzleSchedule(data, runs) {
+function renderZazzleSchedule(data) {
   const {schedule, request} = data ?? {};
   const link = $('zazzle-control-link');
   const repo = config?.repository;
@@ -68,10 +68,9 @@ function renderZazzleSchedule(data, runs) {
   }
   $('zazzle-request').hidden = !request;
   if (request) {
-    const worker = runs.find(run => run.id === request.workerRunId);
     const outcomes = {
       applied: request.operation === 'enable-daily' ? 'Đã lưu lịch Daily Report' : 'Đã xác nhận tắt lịch Daily Report',
-      queued: worker ? ZAZZLE_STATES[worker.state] : 'Đã đưa Daily Report vào hàng đợi',
+      queued: ZAZZLE_STATES[request.workerState] || 'Đã đưa Daily Report vào hàng đợi',
       no_accounts: 'Chưa có nick đang hoạt động đã lưu cookie',
       superseded: 'Đã có cài đặt lịch mới hơn',
     };
@@ -80,9 +79,11 @@ function renderZazzleSchedule(data, runs) {
 }
 
 function renderZazzlePeriod(data, filters) {
-  if (data?.amountsEnabled !== true) return '';
+  if (!data) return empty('Đang chờ dữ liệu Zazzle từ SocialRun.');
+  if (data.amountsEnabled !== true) return empty('Xuất số liệu tổng hợp Zazzle đang tắt trong Cài đặt SocialRun.');
+  if (!data.period) return empty('Chưa có ngày với dữ liệu earnings đầy đủ. Chạy Daily Report để đồng bộ CSV.');
   const period = zazzlePeriod(data.period, filters);
-  if (!period) return data.period ? empty('Khoảng ngày này chưa có dữ liệu earnings đầy đủ đã đồng bộ.') : '';
+  if (!period) return empty('Khoảng ngày này không có dữ liệu đã đồng bộ. Về ngày có dữ liệu mới nhất để xem báo cáo.');
   const dates = period.start === period.end ? reportDate(period.end) : `${reportDate(period.start)} – ${reportDate(period.end)}`;
   const sales = period.days.map(row => `<tr><th scope="row">${escape(reportDate(row.day))}</th>` +
     (period.ranged ? `<td>${n(row.count)}</td>` : '') +
@@ -104,62 +105,19 @@ function renderZazzlePeriod(data, filters) {
     paid + '</tbody></table></div></section>';
 }
 
-function renderZazzleAmounts(run) {
-  const daily = run.daily;
-  if (report.zazzle?.amountsEnabled !== true || !daily) return '';
-  const today = daily.today;
-  const coverage = (covered, missing = 0) =>
-    n(covered) + '/' + n(daily.account_count) + ' nick' + (missing ? ' · ' + n(missing) + ' dòng thiếu số tiền' : '');
-  const pending = daily.dates.map(day => {
-    const entry = daily.pending[day];
-    return '<tr><th scope="row">' + escape(reportDate(day)) + '</th><td>' +
-      publicAmounts(entry.amounts, entry.covered, entry.unknown_amounts) + '</td><td>' +
-      coverage(entry.covered, entry.unknown_amounts) + '</td></tr>';
-  }).join('');
-  const paid = [...daily.months].reverse().map(month => {
-    const entry = daily.payments[month];
-    const label = month.slice(5,7) + '/' + month.slice(0,4);
-    return '<tr><th scope="row">' + escape(label) + '</th><td>' + (entry.covered ? n(entry.count) : '—') + '</td><td>' +
-      publicAmounts(entry.amounts, entry.covered) + '</td><td>' + coverage(entry.covered) + '</td></tr>';
-  }).join('');
-  return '<section class="section"><div class="section-heading"><h2>Earnings Today</h2><span class="section-note">' +
-    coverage(today.covered, today.unknown_amounts) + '</span></div><div class="summary zazzle-figures">' +
-    [['total','Tổng earnings'],['pending','Pending'],['cleared','Cleared']].map(([key,label]) =>
-      metric(label, publicAmounts(today[key], today.covered, today.unknown_amounts), '')).join('') +
-    '</div></section><section class="section"><div class="section-heading"><h2>Pending 3 ngày liên tiếp</h2></div><div class="report-table">' +
-    '<table><thead><tr><th>Ngày</th><th>Pending</th><th>Độ phủ CSV</th></tr></thead><tbody>' + pending +
-    '</tbody></table></div></section><section class="section"><div class="section-heading"><h2>Payment 3 tháng gần nhất</h2></div>' +
-    '<div class="report-table"><table><thead><tr><th>Tháng</th><th>Khoản đã trả</th><th>Số tiền</th><th>Độ phủ CSV</th></tr></thead><tbody>' +
-    paid + '</tbody></table></div></section>';
-}
 function renderZazzle() {
   const data = report?.zazzle;
-  const runs = zazzleRuns(data);
-  renderZazzleSchedule(data, runs);
-  const filters = {start: $('zazzle-start').value, end: $('zazzle-end').value,
-    action: $('zazzle-action').value, state: $('zazzle-state').value};
+  renderZazzleSchedule(data);
+  const filters = {start: $('zazzle-start').value, end: $('zazzle-end').value};
   const {start, end} = filters;
   const invalidRange = start && end && start > end;
-  $('zazzle-clear').hidden = !Object.values(filters).some(Boolean);
+  $('zazzle-clear').hidden = !(start || end);
+  const coverage = $('zazzle-coverage');
+  coverage.hidden = !data?.period?.end;
+  if (!coverage.hidden) coverage.textContent = 'Dữ liệu đầy đủ đến ' + reportDate(data.period.end) + '.';
   $('zazzle-filter-error').hidden = !invalidRange;
   $('zazzle-filter-error').textContent = invalidRange ? 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.' : '';
-  const filteredRuns = invalidRange ? [] : zazzleRuns(data, filters);
-  setOptions($('zazzle-run'), filteredRuns.map(run => [run.id,
-    `${ZAZZLE_ACTIONS[run.action] || 'Lượt Zazzle'} · ${reportDate(run.date)} · ${clock(run.createdAt)}`]));
-  const run = filteredRuns.find(value => value.id === $('zazzle-run').value);
-  $('zazzle-count').textContent = runs.length === filteredRuns.length ? n(runs.length) : `${n(filteredRuns.length)}/${n(runs.length)}`;
-  $('zazzle-run').disabled = !filteredRuns.length;
   $('zazzle-results').innerHTML = invalidRange ? '' : renderZazzlePeriod(data, filters);
-  const details = $('zazzle-details');
-  if (!run) { details.innerHTML = empty(runs.length ? 'Không có lượt Zazzle khớp bộ lọc.' : 'Chưa có lượt Zazzle đã đồng bộ.'); return; }
-  const s = zazzleProgress(run);
-  details.innerHTML = '<div class="zazzle-run-state"><strong>' + escape(ZAZZLE_STATES[run.state] || 'Cần kiểm tra') +
-    '</strong><span>Cập nhật ' + escape(full(run.updatedAt)) + '</span></div><div class="summary">' +
-    metric('HOÀN TẤT', n(s.done) + '<small>/ ' + n(run.total) + ' nick</small>', 'Đã đủ bước của action') +
-    metric('CẦN KIỂM TRA', n(s.attention), 'Lỗi hoặc mới hoàn tất một phần', s.attention ? 'alert' : '') +
-    metric('CHƯA XONG', n(s.waiting), 'Đang chờ hoặc đang chạy') +
-    metric('DỪNG / BỎ QUA', n(s.skipped), 'Theo trạng thái worker') +
-    '</div>' + (!data?.period ? renderZazzleAmounts(run) : '');
 }
 function showTab(tab) {
   const zazzle = tab === 'zazzle';
@@ -168,7 +126,8 @@ function showTab(tab) {
   document.querySelector('.view-only').hidden = zazzle;
   $('facebook-tab').setAttribute('aria-pressed', String(!zazzle));
   $('zazzle-tab').setAttribute('aria-pressed', String(zazzle));
-  $('report-intro').textContent = zazzle ? 'Tiến độ và kết quả các lượt worker Zazzle.' : 'Tiến độ từng nhân viên. Kết quả từng lượt chạy.';
+  $('report-title').textContent = zazzle ? 'Báo cáo Zazzle' : 'Nhật ký công việc';
+  $('report-intro').textContent = zazzle ? 'Earnings, Pending và Payment theo ngày.' : 'Tiến độ từng nhân viên. Kết quả từng lượt chạy.';
 }
 function render() {
   if(!report)return;
@@ -201,13 +160,10 @@ for(const tab of ['facebook','zazzle']) $(tab+'-tab').addEventListener('click',(
   history.replaceState(null,'',tab==='zazzle'?'#zazzle':location.pathname+location.search);
   showTab(tab);
 });
-const zazzleFilters = ['zazzle-start','zazzle-end','zazzle-action','zazzle-state'];
-setOptions($('zazzle-action'), Object.entries(ZAZZLE_ACTIONS), 'Tất cả action');
-setOptions($('zazzle-state'), Object.entries(ZAZZLE_STATES), 'Tất cả trạng thái');
-for(const id of [...zazzleFilters,'zazzle-run']) $(id).addEventListener('change',renderZazzle);
+const zazzleFilters = ['zazzle-start','zazzle-end'];
+for(const id of zazzleFilters) $(id).addEventListener('change',renderZazzle);
 $('zazzle-clear').addEventListener('click', () => {
   for (const id of zazzleFilters) $(id).value = '';
-  $('zazzle-run').value = '';
   renderZazzle();
 });
 $('day').addEventListener('change',()=>{ $('employee').value='';$('group').value='';render(); });

@@ -1,6 +1,6 @@
-export const DONE = new Set(['published', 'pending_approval', 'invited', 'boundary', 'surveyed']);
+export const DONE = new Set(['published', 'pending_approval', 'invited', 'boundary', 'surveyed', 'commented']);
 export const ATTENTION = new Set(['failed', 'partial', 'unverified', 'skipped']);
-export const LABELS = {pending:'Chờ đến giờ',running:'Đang chạy',published:'Đã đăng',pending_approval:'Chờ duyệt',invited:'Đã mời',failed:'Lỗi',partial:'Chưa xong',unverified:'Chưa xác minh',stopped:'Đã dừng',cancelled:'Đã hủy',skipped:'Quá giờ',ignored:'Bỏ qua',boundary:'Đã chạy thử',surveyed:'Đã khảo sát'};
+export const LABELS = {pending:'Chờ đến giờ',running:'Đang chạy',published:'Đã đăng',pending_approval:'Chờ duyệt',invited:'Đã mời',commented:'Đã xác minh bình luận',failed:'Lỗi',partial:'Chưa xong',unverified:'Chưa xác minh',stopped:'Đã dừng',cancelled:'Đã hủy',skipped:'Quá giờ',ignored:'Bỏ qua',boundary:'Đã chạy thử',surveyed:'Đã khảo sát'};
 export const PLAN_LABELS = {planned:'Chưa bật',armed:'Đang chờ lịch',running:'Đang chạy',paused:'Tạm dừng',stopping:'Đang dừng',stopped:'Đã dừng',attention:'Cần kiểm tra',completed:'Đã kết thúc',completed_with_pending:'Còn việc chưa xong'};
 export function confirmed(task) { return DONE.has(task.state) && (['boundary','surveyed'].includes(task.state) || task.receipt?.confirmed === true); }
 export function tasksFor(day) { return (day?.employees ?? []).flatMap(employee => employee.tasks.map(task => ({...task, employee:employee.employee, employeeId:employee.employeeId, planState:employee.state}))).sort((a,b) => a.scheduledAt.localeCompare(b.scheduledAt) || a.employee.localeCompare(b.employee)); }
@@ -15,28 +15,12 @@ export function filtered(tasks, filters) {
     && (filters.status === 'all' || filters.status === 'done' && confirmed(t) || filters.status === 'attention' && ATTENTION.has(t.state)
       || filters.status === 'waiting' && !confirmed(t) && !ATTENTION.has(t.state)));
 }
-export function tone(state) { return ['published','invited','boundary','surveyed'].includes(state) ? 'good' : ['failed','partial','unverified'].includes(state) ? 'bad' : ['pending_approval','skipped'].includes(state) ? 'warm' : state === 'running' ? 'running' : ''; }
+export function tone(state) { return ['published','invited','boundary','surveyed','commented'].includes(state) ? 'good' : ['failed','partial','unverified'].includes(state) ? 'bad' : ['pending_approval','skipped'].includes(state) ? 'warm' : state === 'running' ? 'running' : ''; }
 
-export const ZAZZLE_ACTIONS = {
-  check_store:'Check store', check_balance:'Check balance', check_information:'Check information',
-  check_payment_history:'Check payment history', download_history:'Download earning history', daily_report:'Daily report',
-};
 export const ZAZZLE_STATES = {
   queued:'Chờ chạy', running:'Đang chạy', needs_attention:'Cần xử lý', done:'Hoàn tất',
   partial:'Hoàn tất một phần', failed:'Lỗi', stopped:'Đã dừng',
 };
-export function zazzleProgress(run) {
-  const counts = run?.accounts ?? {};
-  return {done:counts.done ?? 0, attention:(counts.failed ?? 0) + (counts.partial ?? 0),
-    waiting:(counts.pending ?? 0) + (counts.running ?? 0), skipped:(counts.stopped ?? 0) + (counts.skipped ?? 0)};
-}
-
-export function zazzleRuns(data, { start = '', end = '', action = '', state = '' } = {}) {
-  const runs = Array.isArray(data?.runs) ? data.runs : [];
-  return runs.filter(run => (!start || run.date >= start) && (!end || run.date <= end)
-    && (!action || action === run.action) && (!state || state === run.state));
-}
-
 const isoDay = date => date.toISOString().slice(0, 10);
 function offsetDay(day, delta) {
   const date = new Date(day + 'T00:00:00Z');
