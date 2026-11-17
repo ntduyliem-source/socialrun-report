@@ -87,6 +87,12 @@
 .report-run-label select { max-width: min(260px, 62vw); }
 .zazzle-run-state { justify-content: space-between; }
 .zazzle-run-state strong { color: var(--green); }
+.zazzle-control .section-note { margin: 6px 0; }
+.zazzle-control .post-link { margin: 0; }
+.zazzle-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.zazzle-filters label { display: grid; gap: 5px; min-width: 0; color: var(--muted); font-size: 12px; }
+.zazzle-filters :is(input, select) { width: 100%; min-width: 0; }
+.zazzle-filters input { min-height: 40px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: inherit; font: inherit; }
 .zazzle-figures { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .zazzle-figures .metric-number { overflow-wrap: anywhere; font-size: clamp(17px, 2.7vw, 28px); }
 .report-table { overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
@@ -100,6 +106,7 @@
   .theme-toggle { width: 36px; height: 36px; border-radius: 9px; }
   .theme-toggle svg { width: 17px; height: 17px; }
   .zazzle-run-heading { align-items: flex-start; flex-direction: column; }
+  .zazzle-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .zazzle-figures .metric { padding: 12px 9px; }
   .report-table table { font-size: 11px; }
   .report-table :is(th,td) { padding: 9px; }

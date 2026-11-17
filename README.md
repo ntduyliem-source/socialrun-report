@@ -1,13 +1,14 @@
 # SocialRun Report
 
-Buildless HTML/CSS/JavaScript for a public, read-only mobile report. The main
+Buildless HTML/CSS/JavaScript for a public mobile report. The main
 SocialRun repository, database and diagnostics stay private.
 
 ## Hosting
 
 Deploy only these files to the dedicated public report repo's `main` branch:
 `index.html`, `app.js`, `model.js`, `style.css`, `icon.svg`, `config.json`,
-`theme.js`, `theme.css`, `.socialrun-report.json`, `.nojekyll`, `robots.txt`. Enable GitHub Pages from
+`theme.js`, `theme.css`, `.socialrun-report.json`, `.nojekyll`, `robots.txt` and
+`.github/workflows/zazzle-daily.yml`. Enable GitHub Pages from
 `main:/`. No dependencies or build step are needed.
 
 The `data` branch contains only `report.json`. `config.json` points the viewer
@@ -49,7 +50,19 @@ The sun/moon button switches light/dark appearance and remembers the choice on
 that device. First visits follow the phone's system appearance. The palette is
 set before the page paints, including the mobile browser toolbar color.
 GitHub Pages and the report repository are public even though search indexing
-is discouraged. There is no login or access-code protection.
+is discouraged. Viewing the published results is public.
+
+In the Zazzle tab, **Chạy ngay hoặc đặt giờ** opens the **Zazzle Daily Report**
+workflow. The repository owner uses **Run workflow** on `main` with `run-now`,
+`enable-daily` or `disable-daily`. For `enable-daily`, enter `HH:MM` and select
+the timezone. This updates the same worker schedule as the local dashboard.
+The SocialRun API reads completed requests from the verified repo and applies
+each GitHub run ID once. The local Zazzle worker does the balance and earnings
+reads. The static site shows the schedule and the latest receipt.
+
+The Zazzle history filters by inclusive dates, action and state. With public
+Zazzle amounts enabled, verified per-day currency totals also support date-range
+filters. The page uses the latest complete data on first load.
 
 ## Validation
 

@@ -1,0 +1,47 @@
+name: Zazzle Daily Report
+run-name: "SocialRun Zazzle v1 | ${{ inputs.operation }} | ${{ inputs.time }} | ${{ inputs.timezone }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Chạy ngay, bật lịch hằng ngày hoặc tắt lịch
+        type: choice
+        required: true
+        default: run-now
+        options:
+          - run-now
+          - enable-daily
+          - disable-daily
+      time:
+        description: Giờ hằng ngày (HH:MM, chỉ dùng khi bật lịch)
+        type: string
+        required: true
+        default: '09:00'
+      timezone:
+        description: Múi giờ của lịch hằng ngày
+        type: choice
+        required: true
+        default: America/Halifax
+        options:
+          - America/Halifax
+          - Asia/Ho_Chi_Minh
+
+permissions: {}
+
+jobs:
+  request:
+    if: ${{ github.ref == 'refs/heads/main' && github.actor_id == format('{0}', github.event.repository.owner.id) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate request
+        shell: bash
+        env:
+          REPORT_OPERATION: ${{ inputs.operation }}
+          REPORT_TIME: ${{ inputs.time }}
+          REPORT_TIMEZONE: ${{ inputs.timezone }}
+        run: |
+          case "$REPORT_OPERATION" in run-now|enable-daily|disable-daily) ;; *) exit 1 ;; esac
+          [[ "$REPORT_TIME" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || exit 1
+          case "$REPORT_TIMEZONE" in America/Halifax|Asia/Ho_Chi_Minh) ;; *) exit 1 ;; esac
+          echo "Request validated. SocialRun will apply it on the worker machine."

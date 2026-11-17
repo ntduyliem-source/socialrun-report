@@ -31,7 +31,63 @@ export function zazzleProgress(run) {
     waiting:(counts.pending ?? 0) + (counts.running ?? 0), skipped:(counts.stopped ?? 0) + (counts.skipped ?? 0)};
 }
 
-export function zazzleRuns(data, day) {
+export function zazzleRuns(data, { start = '', end = '', action = '', state = '' } = {}) {
   const runs = Array.isArray(data?.runs) ? data.runs : [];
-  return day ? runs.filter(run => run.date === day) : runs;
+  return runs.filter(run => (!start || run.date >= start) && (!end || run.date <= end)
+    && (!action || action === run.action) && (!state || state === run.state));
+}
+
+const isoDay = date => date.toISOString().slice(0, 10);
+function offsetDay(day, delta) {
+  const date = new Date(day + 'T00:00:00Z');
+  date.setUTCDate(date.getUTCDate() + delta);
+  return isoDay(date);
+}
+
+function amountTotal(rows, field) {
+  const totals = new Map();
+  for (const row of rows) {
+    for (const {currency, cents} of row[field] ?? []) {
+      totals.set(currency, (totals.get(currency) ?? 0) + cents);
+    }
+  }
+  return Array.from(totals, ([currency, cents]) => ({currency, cents})).sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+export function zazzlePeriod(period, { start = '', end = '' } = {}) {
+  if (!period?.start || !period.end) return null;
+  const ranged = Boolean(start || end);
+  const requestedStart = start || (ranged ? period.start : period.end);
+  const requestedEnd = end || period.end;
+  const from = requestedStart < period.start ? period.start : requestedStart;
+  const to = requestedEnd > period.end ? period.end : requestedEnd;
+  if (from > to) return null;
+  const sales = (period.days ?? []).filter(row => from <= row.day && row.day <= to);
+  const pendingDays = ranged ? sales : [3, 2, 1].map(delta => {
+    const day = offsetDay(to, -delta);
+    return (period.days ?? []).find(row => row.day === day) ?? {day, pending: [], covered: day >= period.start};
+  });
+
+  const monthStart = new Date(to.slice(0, 7) + '-01T00:00:00Z');
+  if (!ranged) monthStart.setUTCMonth(monthStart.getUTCMonth() - 2);
+  const threshold = isoDay(monthStart);
+  const firstPayment = ranged ? from : threshold > period.start ? threshold : period.start;
+  const payments = new Map();
+  const month = new Date(firstPayment.slice(0, 7) + '-01T00:00:00Z');
+  while (isoDay(month) <= to) {
+    const key = isoDay(month).slice(0, 7);
+    payments.set(key, {month: key, count: 0, cents: 0});
+    month.setUTCMonth(month.getUTCMonth() + 1);
+  }
+  for (const row of period.payments ?? []) {
+    if (row.day < firstPayment || row.day > to) continue;
+    const entry = payments.get(row.day.slice(0, 7));
+    entry.count += row.count;
+    entry.cents += row.cents;
+  }
+  return { start: from, end: to, ranged, adjusted: from !== requestedStart || to !== requestedEnd,
+    sales: sales.reduce((count, row) => count + row.count, 0),
+    unknown: sales.reduce((count, row) => count + row.unknown_amounts, 0),
+    total: amountTotal(sales, 'total'), pending: amountTotal(sales, 'pending'), cleared: amountTotal(sales, 'cleared'),
+    days: pendingDays, payments: [...payments.values()].reverse() };
 }
