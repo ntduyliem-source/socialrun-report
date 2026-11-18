@@ -95,8 +95,11 @@ function renderZazzlePeriod(data, filters) {
     `<span class="section-note">${escape(dates)} · ${n(period.sales)} giao dịch</span></div>` +
     (period.adjusted ? '<p class="section-note">Đã thu hẹp khoảng ngày theo dữ liệu đầy đủ đã đồng bộ.</p>' : '') +
     (period.unknown ? `<p class="section-note">${n(period.unknown)} giao dịch thiếu số tiền.</p>` : '') +
-    '<div class="summary zazzle-figures">' + [['total','Tổng earnings'],['pending','Pending'],['cleared','Cleared']].map(([key,label]) =>
-      metric(label, publicAmounts(period[key], true, period.unknown), '')).join('') + '</div></section>' +
+    '<div class="summary zazzle-figures">' + [['total','Tổng earnings · CSV'],['pending','Pending · CSV'],['cleared','Cleared · CSV']].map(([key,label]) =>
+      metric(label, publicAmounts(period[key], true, period.unknown), '')).join('') +
+      metric('Balance · Earnings Summary', period.balance?.covered ? publicAmounts(period.balance.amounts, true, 0) : '—',
+        period.balance ? `${n(period.balance.covered)}/${n(period.balance.accounts)} tài khoản · Summary ngày ${reportDate(period.balance.day)}` : 'Chưa có Summary trước ngày kết thúc đã chọn') +
+      '</div><p class="section-note">Pending và earnings lấy từ CSV. Balance lấy từ Earnings Summary gần nhất trước ngày kết thúc đã chọn; không cộng từ CSV.</p></section>' +
     `<section class="section"><div class="section-heading"><h2>${period.ranged ? 'Earnings từng ngày' : 'Pending 3 ngày liên tiếp'}</h2></div>` +
     (sales ? `<div class="report-table"><table><thead><tr><th>Ngày</th>${period.ranged ? '<th>Giao dịch</th>' : ''}<th>Pending</th>` +
       `${period.ranged ? '<th>Cleared</th>' : ''}</tr></thead><tbody>${sales}</tbody></table></div>` : empty('Khoảng ngày này không có giao dịch earnings.')) +

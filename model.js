@@ -69,7 +69,10 @@ export function zazzlePeriod(period, { start = '', end = '' } = {}) {
     entry.count += row.count;
     entry.cents += row.cents;
   }
-  return { start: from, end: to, ranged, adjusted: from !== requestedStart || to !== requestedEnd,
+  const balances = (period.balanceHistory ?? []).filter(row => row.day && row.day <= to);
+  const balance = balances.sort((a, b) => b.day.localeCompare(a.day))[0]
+    ?? (period.balance?.day && period.balance.day <= to ? period.balance : null);
+  return { start: from, end: to, ranged, adjusted: from !== requestedStart || to !== requestedEnd, balance,
     sales: sales.reduce((count, row) => count + row.count, 0),
     unknown: sales.reduce((count, row) => count + row.unknown_amounts, 0),
     total: amountTotal(sales, 'total'), pending: amountTotal(sales, 'pending'), cleared: amountTotal(sales, 'cleared'),
