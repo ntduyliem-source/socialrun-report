@@ -38,41 +38,67 @@ function amountTotal(rows, field) {
   return Array.from(totals, ([currency, cents]) => ({currency, cents})).sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
+function allClosed(segments, start, end) {
+  const rows = segments.filter(row => row.start <= end && row.end >= start);
+  return rows.length > 0 && rows[0].start <= start && rows.at(-1).end >= end
+    && rows.every(row => row.accounts > 0 && row.closed === row.accounts);
+}
+
 export function zazzlePeriod(period, { start = '', end = '' } = {}) {
   if (!period?.start || !period.end) return null;
   const ranged = Boolean(start || end);
-  const requestedStart = start || (ranged ? period.start : period.end);
-  const requestedEnd = end || period.end;
+  const coverage = period.coverage;
+  const latest = coverage ? period.latest_closed : period.end;
+  if (!ranged && !latest) return null;
+  const requestedStart = start || (ranged ? period.start : latest);
+  const requestedEnd = end || (ranged ? period.end : latest);
   const from = requestedStart < period.start ? period.start : requestedStart;
   const to = requestedEnd > period.end ? period.end : requestedEnd;
   if (from > to) return null;
   const sales = (period.days ?? []).filter(row => from <= row.day && row.day <= to);
-  const pendingDays = ranged ? sales : [3, 2, 1].map(delta => {
+  const pendingDays = (ranged ? sales : [3, 2, 1].map(delta => {
     const day = offsetDay(to, -delta);
     return (period.days ?? []).find(row => row.day === day) ?? {day, pending: [], covered: day >= period.start};
+  })).map(row => {
+    if (!coverage) return row;
+    const status = coverage.find(segment => segment.start <= row.day && segment.end >= row.day);
+    return {...row, covered: allClosed(coverage, row.day, row.day), coverage: status};
   });
 
   const monthStart = new Date(to.slice(0, 7) + '-01T00:00:00Z');
   if (!ranged) monthStart.setUTCMonth(monthStart.getUTCMonth() - 2);
   const threshold = isoDay(monthStart);
-  const firstPayment = ranged ? from : threshold > period.start ? threshold : period.start;
+  const firstPayment = ranged ? from : (coverage || threshold > period.start ? threshold : period.start);
   const payments = new Map();
   const month = new Date(firstPayment.slice(0, 7) + '-01T00:00:00Z');
   while (isoDay(month) <= to) {
     const key = isoDay(month).slice(0, 7);
-    payments.set(key, {month: key, count: 0, cents: 0});
+    if (coverage) {
+      const startDay = isoDay(month) < firstPayment ? firstPayment : isoDay(month);
+      const next = new Date(month);
+      next.setUTCMonth(next.getUTCMonth() + 1);
+      const monthEnd = offsetDay(isoDay(next), -1);
+      payments.set(key, {month: key, count: 0, amounts: [], complete: allClosed(period.payment_coverage ?? [], startDay, monthEnd < to ? monthEnd : to)});
+    } else {
+      payments.set(key, {month: key, count: 0, cents: 0});
+    }
     month.setUTCMonth(month.getUTCMonth() + 1);
   }
   for (const row of period.payments ?? []) {
     if (row.day < firstPayment || row.day > to) continue;
     const entry = payments.get(row.day.slice(0, 7));
     entry.count += row.count;
-    entry.cents += row.cents;
+    if (coverage) entry.amounts = amountTotal([entry, row], 'amounts');
+    else entry.cents += row.cents;
   }
   const balances = (period.balanceHistory ?? []).filter(row => row.day && row.day <= to);
-  const balance = balances.sort((a, b) => b.day.localeCompare(a.day))[0]
-    ?? (period.balance?.day && period.balance.day <= to ? period.balance : null);
+  const balance = !ranged && coverage ? period.balance : (balances.sort((a, b) => b.day.localeCompare(a.day))[0]
+    ?? (period.balance?.day && period.balance.day <= to ? period.balance : null));
+  const last = (period.payments ?? []).filter(row => firstPayment <= row.day && row.day <= to)
+    .sort((a,b) => b.day.localeCompare(a.day))[0];
   return { start: from, end: to, ranged, adjusted: from !== requestedStart || to !== requestedEnd, balance,
+    complete: coverage ? allClosed(coverage, from, to) : true, last_payment_day: last,
+    previous: !ranged ? period.previous : null,
     sales: sales.reduce((count, row) => count + row.count, 0),
     unknown: sales.reduce((count, row) => count + row.unknown_amounts, 0),
     total: amountTotal(sales, 'total'), pending: amountTotal(sales, 'pending'), cleared: amountTotal(sales, 'cleared'),

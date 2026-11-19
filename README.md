@@ -60,11 +60,13 @@ The SocialRun API reads completed requests from the verified repo and applies
 each GitHub run ID once. The local Zazzle worker does the balance and earnings
 reads. The static site shows the schedule and the latest receipt.
 
-When Zazzle totals are enabled, the page opens to earnings on the latest
-complete day, the three preceding days of Pending, and payments from the last
-three calendar months. The date range filters earnings and payments by inclusive
-transaction dates. Only aggregate totals and the latest Daily Report command
-status are published.
+When Zazzle totals are enabled, the page shows today's provisional CSV snapshot
+and the latest date with complete CSV coverage collected after the day closed.
+The default view includes the three preceding days of Pending and cleared
+payouts from Payment History for the last three calendar months. The date range
+filters the aggregates by inclusive transaction dates. Counts and source
+timestamps accompany the aggregates, while account and transaction identities
+stay in the local dashboard.
 
 ## Validation
 

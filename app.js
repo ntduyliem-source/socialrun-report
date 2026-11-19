@@ -1,4 +1,4 @@
-import {LABELS,PLAN_LABELS,tasksFor,summary,filtered,tone,ZAZZLE_STATES,zazzlePeriod} from './model.js?v=2';
+import {LABELS,PLAN_LABELS,tasksFor,summary,filtered,tone,ZAZZLE_STATES,zazzlePeriod} from './model.js?v=3';
 const $=id=>document.getElementById(id), escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let report=null,config=null,busy=false,filter='all',fetchFailed=false;
 try { const saved=localStorage.getItem('socialrun-report-timezone');$('timezone').value=['Asia/Ho_Chi_Minh','America/Halifax'].includes(saved)?saved:'Asia/Ho_Chi_Minh'; } catch {}
@@ -45,10 +45,11 @@ function renderLog(tasks) {
   }).join(''):empty(tasks.length?'Không có lượt nào khớp bộ lọc.':'Ngày này chưa có công việc.');
 }
 const reportDate = day => day.split('-').reverse().join('/');
+const sourceWindow = (first, last) => (first && first !== last ? full(first) + ' – ' : '') + full(last);
 const reportCurrency = (cents, currency) => new Intl.NumberFormat('vi-VN', {style:'currency', currency}).format(cents / 100);
 function publicAmounts(amounts, covered, unknown = 0) {
   return escape(amounts.length ? amounts.map(row => reportCurrency(row.cents, row.currency)).join(' · ') :
-    covered && !unknown ? reportCurrency(0, 'USD') : '—');
+    covered && !unknown ? reportCurrency(0, 'USD') : 'Chưa đủ dữ liệu');
 }
 function renderZazzleSchedule(data) {
   const {schedule, request} = data ?? {};
@@ -78,33 +79,60 @@ function renderZazzleSchedule(data) {
   }
 }
 
+function renderZazzleToday(today) {
+  if (!today) return '';
+  const {day, coverage, sale} = today;
+  const title = 'Hôm nay ' + reportDate(day);
+  const value = sale.count ? publicAmounts(sale.total, false, sale.unknown_amounts) :
+    coverage.observed ? '0 dòng royalty ghi nhận' : 'Chưa có CSV';
+  const stamp = coverage.newest_checked_at ? 'CSV tạm tính · ' + sourceWindow(coverage.oldest_checked_at, coverage.newest_checked_at) : 'Chờ worker lấy Earnings History';
+  return `<section class="section"><div class="section-heading"><h2>${escape(title)}</h2></div><div class="summary">` +
+    metric('Earnings hôm nay', value, escape(stamp) + ` · ${n(coverage.observed)}/${n(coverage.accounts)} nick`) + '</div></section>';
+}
+
+function publicComparison(period) {
+  if (!period.previous || period.unknown || period.previous.unknown_amounts) return '';
+  const delta = new Map(period.total.map(row => [row.currency, row.cents]));
+  for (const row of period.previous.total) delta.set(row.currency, (delta.get(row.currency) ?? 0) - row.cents);
+  const difference = [...delta].map(([currency, cents]) => (cents > 0 ? '+' : '') + reportCurrency(cents, currency));
+  return difference.length ? '<p class="section-note">' + escape('So với ' + reportDate(period.previous.end) + ' · ' + difference.join(' · ')) + '</p>' : '';
+}
+
 function renderZazzlePeriod(data, filters) {
   if (!data) return empty('Đang chờ dữ liệu Zazzle từ SocialRun.');
   if (data.amountsEnabled !== true) return empty('Xuất số liệu tổng hợp Zazzle đang tắt trong Cài đặt SocialRun.');
   if (!data.period) return empty('Chưa có ngày với dữ liệu earnings đầy đủ. Chạy Daily Report để đồng bộ CSV.');
   const period = zazzlePeriod(data.period, filters);
-  if (!period) return empty('Khoảng ngày này không có dữ liệu đã đồng bộ. Về ngày có dữ liệu mới nhất để xem báo cáo.');
+  const today = renderZazzleToday(data.period.today);
+  if (!period) return today + empty(filters.start || filters.end ? 'Khoảng đã chọn chưa có dữ liệu.' : 'Chưa có ngày đã chốt.');
   const dates = period.start === period.end ? reportDate(period.end) : `${reportDate(period.start)} – ${reportDate(period.end)}`;
   const sales = period.days.map(row => `<tr><th scope="row">${escape(reportDate(row.day))}</th>` +
     (period.ranged ? `<td>${n(row.count)}</td>` : '') +
     `<td>${publicAmounts(row.pending, row.covered !== false, row.unknown_amounts)}</td>` +
-    (period.ranged ? `<td>${publicAmounts(row.cleared, true, row.unknown_amounts)}</td>` : '') + '</tr>').join('');
+    (period.ranged ? `<td>${publicAmounts(row.cleared, row.covered !== false, row.unknown_amounts)}</td>` : '') +
+    (data.period.coverage ? `<td>${row.covered ? 'Đã chốt' : 'Chưa đủ dữ liệu'}</td>` : '') + '</tr>').join('');
   const paid = period.payments.map(row => `<tr><th scope="row">${escape(row.month.slice(5) + '/' + row.month.slice(0, 4))}</th>` +
-    `<td>${n(row.count)}</td><td>${escape(reportCurrency(row.cents, 'USD'))}</td></tr>`).join('');
-  return `<section class="section"><div class="section-heading"><h2>${period.ranged ? 'Earnings theo khoảng ngày' : 'Earnings ngày gần nhất'}</h2>` +
-    `<span class="section-note">${escape(dates)} · ${n(period.sales)} giao dịch</span></div>` +
-    (period.adjusted ? '<p class="section-note">Đã thu hẹp khoảng ngày theo dữ liệu đầy đủ đã đồng bộ.</p>' : '') +
+    `<td>${row.count || row.complete !== false ? n(row.count) : '—'}</td><td>${row.amounts ? publicAmounts(row.amounts, row.complete) : escape(reportCurrency(row.cents, 'USD'))}</td>` +
+    (data.period.coverage ? `<td>${row.complete ? 'Đã kiểm tra đủ' : 'Chờ kiểm tra đủ'}</td>` : '') + '</tr>').join('');
+  return today + `<section class="section"><div class="section-heading"><h2>${period.ranged ? 'Earnings theo khoảng ngày' : 'Earnings ngày chốt gần nhất'}</h2>` +
+    `<span class="section-note">${escape(dates)} · ${period.complete || period.sales ? n(period.sales) + ' dòng royalty' : 'Chưa đủ dữ liệu'}</span></div>` +
+    (period.adjusted ? '<p class="section-note">Khoảng hiển thị đã được giới hạn theo ngày có thể báo cáo.</p>' : '') +
+    (!period.complete ? '<p class="section-note">Số liệu của khoảng này còn tạm tính.</p>' : '') +
     (period.unknown ? `<p class="section-note">${n(period.unknown)} giao dịch thiếu số tiền.</p>` : '') +
     '<div class="summary zazzle-figures">' + [['total','Tổng earnings · CSV'],['pending','Pending · CSV'],['cleared','Cleared · CSV']].map(([key,label]) =>
-      metric(label, publicAmounts(period[key], true, period.unknown), '')).join('') +
+      metric(label, publicAmounts(period[key], period.complete, period.unknown), '')).join('') +
       metric('Balance · Earnings Summary', period.balance?.covered ? publicAmounts(period.balance.amounts, true, 0) : '—',
-        period.balance ? `${n(period.balance.covered)}/${n(period.balance.accounts)} tài khoản · Summary ngày ${reportDate(period.balance.day)}` : 'Chưa có Summary trước ngày kết thúc đã chọn') +
-      '</div><p class="section-note">Pending và earnings lấy từ CSV. Balance lấy từ Earnings Summary gần nhất trước ngày kết thúc đã chọn; không cộng từ CSV.</p></section>' +
-    `<section class="section"><div class="section-heading"><h2>${period.ranged ? 'Earnings từng ngày' : 'Pending 3 ngày liên tiếp'}</h2></div>` +
+        period.balance?.newest_checked_at ? `${n(period.balance.covered)}/${n(period.balance.accounts)} tài khoản · ${escape(sourceWindow(period.balance.oldest_checked_at, period.balance.newest_checked_at))}` : 'Chưa có Summary trong phạm vi báo cáo') +
+      '</div>' + publicComparison(period) + '</section>' +
+    `<section class="section"><div class="section-heading"><h2>${period.ranged ? 'Earnings từng ngày' : 'Pending 3 ngày liền trước'}</h2></div>` +
     (sales ? `<div class="report-table"><table><thead><tr><th>Ngày</th>${period.ranged ? '<th>Giao dịch</th>' : ''}<th>Pending</th>` +
-      `${period.ranged ? '<th>Cleared</th>' : ''}</tr></thead><tbody>${sales}</tbody></table></div>` : empty('Khoảng ngày này không có giao dịch earnings.')) +
-    `</section><section class="section"><div class="section-heading"><h2>${period.ranged ? 'Payment trong khoảng ngày' : 'Payment 3 tháng gần nhất'}</h2></div>` +
-    '<div class="report-table"><table><thead><tr><th>Tháng</th><th>Khoản đã trả</th><th>Số tiền</th></tr></thead><tbody>' +
+      `${period.ranged ? '<th>Cleared</th>' : ''}${data.period.coverage ? '<th>Độ đầy đủ</th>' : ''}</tr></thead><tbody>${sales}</tbody></table></div>` :
+      empty(period.complete ? 'Khoảng này không có dòng royalty.' : 'Chưa ghi nhận royalty từ dữ liệu đã lấy.')) +
+    `</section><section class="section"><div class="section-heading"><h2>${period.ranged ? 'Payout trong khoảng ngày' : 'Payout 3 tháng gần nhất'}</h2>` +
+    (data.period.coverage ? '<span class="section-note">Payment History · Đã trả</span>' : '') + '</div>' +
+    (period.last_payment_day?.amounts ? `<p class="section-note">Payout gần nhất ngày ${escape(reportDate(period.last_payment_day.day))} · ${publicAmounts(period.last_payment_day.amounts, true)}</p>` : '') +
+    '<div class="report-table"><table><thead><tr><th>Tháng</th><th>Khoản đã trả</th><th>Số tiền</th>' +
+    (data.period.coverage ? '<th>Độ đầy đủ</th>' : '') + '</tr></thead><tbody>' +
     paid + '</tbody></table></div></section>';
 }
 
@@ -116,8 +144,9 @@ function renderZazzle() {
   const invalidRange = start && end && start > end;
   $('zazzle-clear').hidden = !(start || end);
   const coverage = $('zazzle-coverage');
-  coverage.hidden = !data?.period?.end;
-  if (!coverage.hidden) coverage.textContent = 'Dữ liệu đầy đủ đến ' + reportDate(data.period.end) + '.';
+  const closed = data?.period?.coverage ? data.period.latest_closed : data?.period?.end;
+  coverage.hidden = !closed;
+  if (closed) coverage.textContent = 'Ngày chốt gần nhất ' + reportDate(closed) + ' · ' + (data.schedule?.timezone ?? '');
   $('zazzle-filter-error').hidden = !invalidRange;
   $('zazzle-filter-error').textContent = invalidRange ? 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.' : '';
   $('zazzle-results').innerHTML = invalidRange ? '' : renderZazzlePeriod(data, filters);
