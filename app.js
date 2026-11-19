@@ -247,5 +247,13 @@ $('clear').addEventListener('click',()=>{$('employee').value='';$('group').value
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 setInterval(()=>{if(!document.hidden)refresh();},30000);
 setInterval(syncStatus,15000);
+window.addEventListener('hashchange', () => {
+  const tab = location.hash;
+  if (tab === '#zazzle' || tab === '#zazzle-check-sale') {
+    zazzleView = tab === '#zazzle' ? 'overview' : 'sales';
+    showTab('zazzle');
+    renderZazzle();
+  } else showTab('facebook');
+});
 showTab(['#zazzle','#zazzle-check-sale'].includes(location.hash)?'zazzle':'facebook');
 refresh();
