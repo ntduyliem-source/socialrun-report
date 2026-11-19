@@ -1,6 +1,7 @@
-import {LABELS,PLAN_LABELS,tasksFor,summary,filtered,tone,ZAZZLE_STATES,zazzlePeriod} from './model.js?v=3';
+import {LABELS,PLAN_LABELS,tasksFor,summary,filtered,tone,ZAZZLE_STATES,zazzlePeriod,SALE_STATES,zazzleSales} from './model.js?v=4';
 const $=id=>document.getElementById(id), escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let report=null,config=null,busy=false,filter='all',fetchFailed=false;
+let zazzleView = location.hash === '#zazzle-check-sale' ? 'sales' : 'overview', salesPage = 1;
 try { const saved=localStorage.getItem('socialrun-report-timezone');$('timezone').value=['Asia/Ho_Chi_Minh','America/Halifax'].includes(saved)?saved:'Asia/Ho_Chi_Minh'; } catch {}
 const zone=()=>$('timezone').value, fmt=(at,options={})=>at?new Intl.DateTimeFormat('vi-VN',{timeZone:zone(),...options}).format(new Date(at)):'—';
 const clock=at=>fmt(at,{hour:'2-digit',minute:'2-digit',hourCycle:'h23'}), date=at=>fmt(at,{day:'2-digit',month:'2-digit'}), full=at=>fmt(at,{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
@@ -29,8 +30,8 @@ function renderEmployees(day) {
   }).join(''):empty('Chưa có lịch chạy trong ngày này.');
 }
 function renderLog(tasks) {
-  const filters={employee:$('employee').value,group:$('group').value,status:filter},rows=filtered(tasks,filters),opened=new Set([...$('log').querySelectorAll('details[open]')].map(el=>el.dataset.id));
-  $('clear').hidden=!filters.employee&&!filters.group&&filter==='all';
+  const filters={employee:$('employee').value,group:$('group').value,action:$('action').value,status:filter},rows=filtered(tasks,filters),opened=new Set([...$('log').querySelectorAll('details[open]')].map(el=>el.dataset.id));
+  $('clear').hidden=!filters.employee&&!filters.group&&!filters.action&&filter==='all';
   $('log-count').textContent=rows.length===tasks.length?n(rows.length):`${n(rows.length)}/${n(tasks.length)}`;
   $('log').innerHTML=rows.length?rows.map(t=>{
     const r=t.receipt||{},target=t.group||(t.action==='wall_post'?'Wall':t.action==='story'?'Story':''),invite=r.confirmed&&r.kind==='invitation';
@@ -136,20 +137,51 @@ function renderZazzlePeriod(data, filters) {
     paid + '</tbody></table></div></section>';
 }
 
+function renderPublicSales(data, filters) {
+  if (!data) return empty('Đang chờ dữ liệu Zazzle từ SocialRun.');
+  if (data.amountsEnabled !== true) return empty('Xuất số liệu tổng hợp Zazzle đang tắt trong Cài đặt SocialRun.');
+  if (!data.period) return empty('Chưa có CSV Earning History.');
+  const result = zazzleSales(data.period, filters);
+  if (!result) return empty('Bản dữ liệu này chưa có chi tiết sản phẩm.');
+  const {rows, from, to, complete} = result;
+  const pageSize = 100, pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  salesPage = Math.min(pages, Math.max(1, salesPage));
+  $('zazzle-sales-pager').hidden = pages <= 1;
+  $('zazzle-page').textContent = `${salesPage}/${pages}`;
+  $('zazzle-prev').disabled = salesPage === 1;
+  $('zazzle-next').disabled = salesPage === pages;
+  const dates = reportDate(from) + (from === to ? '' : ' – ' + reportDate(to));
+  const total = rows.reduce((sum, row) => sum + row[3], 0);
+  const table = rows.slice((salesPage - 1) * pageSize, salesPage * pageSize).map(([day, pid, status, count, amounts, unknown]) =>
+    `<tr><td>${escape(reportDate(day))}</td><th scope="row">${escape(pid || '—')}</th><td>${escape(SALE_STATES[status])}</td>` +
+    `<td>${n(count)}</td><td>${publicAmounts(amounts, true, unknown)}${unknown ? `<small> · ${n(unknown)} dòng thiếu số tiền</small>` : ''}</td></tr>`).join('');
+  return `<section class="section"><div class="section-heading"><h2>Check Sale</h2>` +
+    `<span class="section-note">${escape(dates)} · ${n(total)} giao dịch</span></div>` +
+    (!complete ? '<p class="section-note">CSV của khoảng này còn thiếu.</p>' : '') +
+    (table ? `<div class="report-table" tabindex="0" aria-label="Bảng Check Sale"><table><thead><tr><th>Ngày sale</th><th>Product ID</th>` +
+      `<th>Trạng thái</th><th>Số giao dịch</th><th>Royalty</th></tr></thead><tbody>${table}</tbody></table></div>` :
+      empty('Chưa ghi nhận giao dịch khớp bộ lọc.')) + '</section>';
+}
+
 function renderZazzle() {
   const data = report?.zazzle;
   renderZazzleSchedule(data);
-  const filters = {start: $('zazzle-start').value, end: $('zazzle-end').value};
+  const sales = zazzleView === 'sales';
+  $('zazzle-sales-filters').hidden = !sales;
+  $('zazzle-overview-tab').setAttribute('aria-pressed', String(!sales));
+  $('zazzle-sales-tab').setAttribute('aria-pressed', String(sales));
+  $('zazzle-sales-pager').hidden = true;
+  const filters = {start: $('zazzle-start').value, end: $('zazzle-end').value, product: $('zazzle-product').value, status: $('zazzle-sale-status').value};
   const {start, end} = filters;
   const invalidRange = start && end && start > end;
-  $('zazzle-clear').hidden = !(start || end);
+  $('zazzle-clear').hidden = !(start || end || (sales && (filters.product || filters.status)));
   const coverage = $('zazzle-coverage');
   const closed = data?.period?.coverage ? data.period.latest_closed : data?.period?.end;
   coverage.hidden = !closed;
   if (closed) coverage.textContent = 'Ngày chốt gần nhất ' + reportDate(closed) + ' · ' + (data.schedule?.timezone ?? '');
   $('zazzle-filter-error').hidden = !invalidRange;
   $('zazzle-filter-error').textContent = invalidRange ? 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.' : '';
-  $('zazzle-results').innerHTML = invalidRange ? '' : renderZazzlePeriod(data, filters);
+  $('zazzle-results').innerHTML = invalidRange ? '' : sales ? renderPublicSales(data, filters) : renderZazzlePeriod(data, filters);
 }
 function showTab(tab) {
   const zazzle = tab === 'zazzle';
@@ -189,23 +221,31 @@ async function refresh() {
 }
 $('refresh').addEventListener('click',refresh);
 for(const tab of ['facebook','zazzle']) $(tab+'-tab').addEventListener('click',()=>{
-  history.replaceState(null,'',tab==='zazzle'?'#zazzle':location.pathname+location.search);
+  history.replaceState(null,'',tab==='zazzle'?(zazzleView === 'sales' ? '#zazzle-check-sale' : '#zazzle'):location.pathname+location.search);
   showTab(tab);
 });
-const zazzleFilters = ['zazzle-start','zazzle-end'];
-for(const id of zazzleFilters) $(id).addEventListener('change',renderZazzle);
-$('zazzle-clear').addEventListener('click', () => {
-  for (const id of zazzleFilters) $(id).value = '';
+for (const tab of ['overview', 'sales']) $('zazzle-' + tab + '-tab').addEventListener('click', () => {
+  zazzleView = tab;
+  history.replaceState(null, '', tab === 'sales' ? '#zazzle-check-sale' : '#zazzle');
   renderZazzle();
 });
+const zazzleFilters = ['zazzle-start','zazzle-end','zazzle-product','zazzle-sale-status'];
+for(const id of zazzleFilters) $(id).addEventListener(id === 'zazzle-product' ? 'input' : 'change', () => { salesPage = 1; renderZazzle(); });
+$('zazzle-clear').addEventListener('click', () => {
+  for (const id of zazzleFilters) $(id).value = '';
+  salesPage = 1;
+  renderZazzle();
+});
+$('zazzle-prev').addEventListener('click', () => { salesPage--; renderZazzle(); });
+$('zazzle-next').addEventListener('click', () => { salesPage++; renderZazzle(); });
 $('day').addEventListener('change',()=>{ $('employee').value='';$('group').value='';render(); });
 $('timezone').addEventListener('change',()=>{try{localStorage.setItem('socialrun-report-timezone',zone());}catch{}render();});
-for(const id of ['employee','group'])$(id).addEventListener('change',()=>renderLog(tasksFor(report?.days.find(d=>d.date===$('day').value))));
+for(const id of ['employee','group','action'])$(id).addEventListener('change',()=>renderLog(tasksFor(report?.days.find(d=>d.date===$('day').value))));
 function chooseFilter(value){filter=value;document.querySelectorAll('[data-filter]').forEach(button=>{const active=button.dataset.filter===value;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});}
 $('status-filters').addEventListener('click',e=>{const button=e.target.closest('[data-filter]');if(button){chooseFilter(button.dataset.filter);renderLog(tasksFor(report?.days.find(d=>d.date===$('day').value)));}});
-$('clear').addEventListener('click',()=>{$('employee').value='';$('group').value='';chooseFilter('all');render();});
+$('clear').addEventListener('click',()=>{$('employee').value='';$('group').value='';$('action').value='';chooseFilter('all');render();});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 setInterval(()=>{if(!document.hidden)refresh();},30000);
 setInterval(syncStatus,15000);
-showTab(location.hash==='#zazzle'?'zazzle':'facebook');
+showTab(['#zazzle','#zazzle-check-sale'].includes(location.hash)?'zazzle':'facebook');
 refresh();

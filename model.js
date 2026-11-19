@@ -12,8 +12,16 @@ export function summary(tasks) {
 }
 export function filtered(tasks, filters) {
   return tasks.filter(t => (!filters.employee || t.employeeId === filters.employee) && (!filters.group || (t.group || (t.action === 'wall_post' ? 'Wall' : t.action === 'story' ? 'Story' : t.label)) === filters.group)
+    && matchesAction(t.action, filters.action)
     && (filters.status === 'all' || filters.status === 'done' && confirmed(t) || filters.status === 'attention' && ATTENTION.has(t.state)
       || filters.status === 'waiting' && !confirmed(t) && !ATTENTION.has(t.state)));
+}
+
+function matchesAction(action, filter) {
+  if (!filter) return true;
+  if (filter === 'invite_group') return action === 'invite_group_chrome' || action === 'invite_group_ld';
+  if (filter === 'wall_story') return action === 'wall_post' || action === 'story';
+  return action === filter;
 }
 export function tone(state) { return ['published','invited','boundary','surveyed','commented'].includes(state) ? 'good' : ['failed','partial','unverified'].includes(state) ? 'bad' : ['pending_approval','skipped'].includes(state) ? 'warm' : state === 'running' ? 'running' : ''; }
 
@@ -21,6 +29,18 @@ export const ZAZZLE_STATES = {
   queued:'Chờ chạy', running:'Đang chạy', needs_attention:'Cần xử lý', done:'Hoàn tất',
   partial:'Hoàn tất một phần', failed:'Lỗi', stopped:'Đã dừng',
 };
+export const SALE_STATES = {pending:'Pending', cleared:'Cleared', canceled:'Cancelled'};
+
+export function zazzleSales(period, { start = '', end = '', product = '', status = '' } = {}) {
+  if (!Array.isArray(period?.salesByProduct)) return null;
+  const ranged = Boolean(start || end);
+  const from = start || (ranged ? period.start : period.latest_closed || period.end);
+  const to = end || (ranged ? period.end : from);
+  const pid = product.trim();
+  const rows = period.salesByProduct.filter(([day, id, state]) => day >= from && day <= to &&
+    (!pid || id.includes(pid)) && (!status || state === status));
+  return {from, to, rows, complete: allClosed(period.coverage ?? [], from, to)};
+}
 const isoDay = date => date.toISOString().slice(0, 10);
 function offsetDay(day, delta) {
   const date = new Date(day + 'T00:00:00Z');

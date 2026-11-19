@@ -89,6 +89,9 @@
 .zazzle-filters label { display: grid; gap: 5px; min-width: 0; color: var(--muted); font-size: 12px; }
 .zazzle-filters :is(input, select) { width: 100%; min-width: 0; }
 .zazzle-filters input { min-height: 40px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: inherit; font: inherit; }
+.zazzle-sale-filters { margin-top: 10px; }
+.zazzle-sale-pager { display: flex; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 10px; color: var(--muted); font-size: 12px; }
+.zazzle-sale-pager button:disabled { opacity: .45; cursor: default; }
 .zazzle-figures { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .zazzle-figures .metric-number { overflow-wrap: anywhere; font-size: clamp(17px, 2.7vw, 28px); }
 .report-table { overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
