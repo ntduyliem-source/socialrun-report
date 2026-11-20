@@ -2,8 +2,26 @@ export const DONE = new Set(['published', 'pending_approval', 'invited', 'bounda
 export const ATTENTION = new Set(['failed', 'partial', 'unverified', 'skipped']);
 export const LABELS = {pending:'Chờ đến giờ',running:'Đang chạy',published:'Đã đăng',pending_approval:'Chờ duyệt',invited:'Đã mời',commented:'Đã xác minh bình luận',failed:'Lỗi',partial:'Chưa xong',unverified:'Chưa xác minh',stopped:'Đã dừng',cancelled:'Đã hủy',skipped:'Quá giờ',ignored:'Bỏ qua',boundary:'Đã chạy thử',surveyed:'Đã khảo sát'};
 export const PLAN_LABELS = {planned:'Chưa bật',armed:'Đang chờ lịch',running:'Đang chạy',paused:'Tạm dừng',stopping:'Đang dừng',stopped:'Đã dừng',attention:'Cần kiểm tra',completed:'Đã kết thúc',completed_with_pending:'Còn việc chưa xong'};
+function followExhausted(task) {
+  const r=task.receipt;
+  return task.action==='invite_follow' && ['invited','partial'].includes(task.state) && r?.kind==='invitation'
+    && r.confirmed===true && r.queueExhausted===true && r.invited===r.verified
+    && r.shortfall>0 && r.shortfall===r.requested-r.verified;
+}
+export function taskLabel(task) {
+  if (followExhausted(task)) {
+    const {receipt}=task;
+    return receipt.sourceScope==='selection' ? 'Đã kiểm hết link đã chọn' : 'Hết người mời';
+  }
+  return LABELS[task.state] || task.state;
+}
 export function confirmed(task) { return DONE.has(task.state) && (['boundary','surveyed'].includes(task.state) || task.receipt?.confirmed === true); }
-export function tasksFor(day) { return (day?.employees ?? []).flatMap(employee => employee.tasks.map(task => ({...task, employee:employee.employee, employeeId:employee.employeeId, planState:employee.state}))).sort((a,b) => a.scheduledAt.localeCompare(b.scheduledAt) || a.employee.localeCompare(b.employee)); }
+export function tasksFor(day) {
+  return (day?.employees ?? []).flatMap(employee => employee.tasks.map(task => ({...task,
+    ...(followExhausted(task) ? {state:'invited',errorCode:''} : {}),
+    employee:employee.employee, employeeId:employee.employeeId, planState:employee.state})))
+    .sort((a,b) => a.scheduledAt.localeCompare(b.scheduledAt) || a.employee.localeCompare(b.employee));
+}
 export function summary(tasks) {
   return {total:tasks.length, done:tasks.filter(confirmed).length, approval:tasks.filter(t => confirmed(t) && t.state === 'pending_approval').length,
     attention:tasks.filter(t => ATTENTION.has(t.state)).length, running:tasks.filter(t => t.state === 'running').length,
