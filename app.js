@@ -1,5 +1,5 @@
-import {LABELS,PLAN_LABELS,tasksFor,summary,filtered,tone,taskLabel,ZAZZLE_STATES,zazzlePeriod,SALE_STATES,zazzleSales} from './model.js?v=5';
-import {mountShortlinks} from './shortlinks.js?v=1';
+import {LABELS,PLAN_LABELS,tasksFor,summary,filtered,tone,taskLabel,ZAZZLE_STATES,zazzlePeriod,SALE_STATES,zazzleSales} from './model.js?v=6';
+import {mountShortlinks} from './shortlinks.js?v=2';
 const $=id=>document.getElementById(id), escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let report=null,config=null,busy=false,filter='all',fetchFailed=false;
 let zazzleView = location.hash === '#zazzle-check-sale' ? 'sales' : 'overview', salesPage = 1;
@@ -45,6 +45,13 @@ function renderLog(tasks) {
       note=`Đã mời ${n(r.invited)} người · ${n(r.verified)} xác minh trực tiếp${accepted?` · ${n(accepted)} theo lô`:''}.${r.queueExhausted?' Đã hết người đủ điều kiện trong các link đã kiểm.':''}${r.shortfall?` Thiếu ${n(r.shortfall)} so với quota.`:''}${reconciliation}`;
     }
     const safeUrl=r.url&&/^https:\/\/www\.facebook\.com\//.test(r.url)?r.url:'';
+    if (t.state === 'unverified' && t.recovery?.state === 'reconcile') {
+      note = t.planState === 'paused' ? 'Lịch đang Pause. Lượt kiểm tra chờ lịch hoạt động trở lại.' :
+        `Worker sẽ kiểm tra bài đã gửi${t.recovery.dueAt ? ' từ ' + full(t.recovery.dueAt) : ''}.`;
+    }
+    if (t.state === 'partial' && t.followCheck?.verified > 0) {
+      note = `Đã xác minh ${n(t.followCheck.verified)}/${n(t.quantity)} lời mời.`;
+    }
     return `<details class="log-row" data-id="${escape(t.id)}" data-tone="${tone(t.state)==='running'?'':tone(t.state)}"${opened.has(t.id)?' open':''}><summary><time class="log-time" datetime="${escape(t.scheduledAt)}">${escape(clock(t.scheduledAt))}<small class="log-day">${escape(date(t.scheduledAt))}</small></time><div class="log-main"><div class="log-title">${escape(t.employee)} <span class="log-role">/ ${escape(t.role)}</span></div><div class="log-description">${escape(t.label)}${target?' · '+escape(target):''}${invite?' · '+n(r.invited)+' người':''}</div></div><div class="log-outcome">${badge(t)}<span class="expand-arrow" aria-hidden="true">⌄</span></div></summary><div class="log-detail"><div class="detail-item">Thiết bị<strong>${t.engine==='chrome'?'Chrome':t.engine==='ldplayer'?'LDPlayer':'—'}</strong></div><div class="detail-item">Khung giờ<strong>${escape(clock(t.scheduledAt))} – ${escape(clock(t.endsAt))}</strong></div><div class="detail-item">Số lượng<strong>${n(t.quantity)} ${t.action.startsWith('invite_')?'người':'lượt'}</strong></div><div class="detail-item">Số lần chạy<strong>${n(t.attempts)}</strong></div>${t.attempts?`<div class="detail-item">Ghi nhận gần nhất<strong>${escape(full(t.updatedAt))}</strong></div>`:''}${note?`<p class="detail-note">${escape(note)}</p>`:''}${t.errorCode?`<p class="detail-note">Mã lỗi: ${escape(t.errorCode)}</p>`:''}${safeUrl?`<a class="post-link" href="${escape(safeUrl)}" target="_blank" rel="noopener noreferrer">Xem bài trên Facebook ↗</a>`:''}</div></details>`;
   }).join(''):empty(tasks.length?'Không có lượt nào khớp bộ lọc.':'Ngày này chưa có công việc.');
 }

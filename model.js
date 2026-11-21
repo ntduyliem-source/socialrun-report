@@ -13,8 +13,13 @@ export function taskLabel(task) {
     const {receipt}=task;
     return receipt.sourceScope==='selection' ? 'Đã kiểm hết link đã chọn' : 'Hết người mời';
   }
+  if (task.state === 'unverified' && task.recovery?.state === 'reconcile') {
+    return task.planState === 'paused' ? 'Tạm dừng kiểm tra' : 'Chờ kiểm tra bài đã gửi';
+  }
+  if (task.state === 'partial' && task.followCheck?.verified > 0) return 'Đã mời một phần';
   return LABELS[task.state] || task.state;
 }
+function needsAttention(task) { return ATTENTION.has(task.state) && task.recovery?.state !== 'reconcile'; }
 export function confirmed(task) { return DONE.has(task.state) && (['boundary','surveyed'].includes(task.state) || task.receipt?.confirmed === true); }
 export function tasksFor(day) {
   return (day?.employees ?? []).flatMap(employee => employee.tasks.map(task => ({...task,
@@ -24,15 +29,15 @@ export function tasksFor(day) {
 }
 export function summary(tasks) {
   return {total:tasks.length, done:tasks.filter(confirmed).length, approval:tasks.filter(t => confirmed(t) && t.state === 'pending_approval').length,
-    attention:tasks.filter(t => ATTENTION.has(t.state)).length, running:tasks.filter(t => t.state === 'running').length,
-    waiting:tasks.filter(t => !confirmed(t) && !ATTENTION.has(t.state) && !['ignored','cancelled','stopped'].includes(t.state)).length,
+    attention:tasks.filter(needsAttention).length, running:tasks.filter(t => t.state === 'running').length,
+    waiting:tasks.filter(t => !confirmed(t) && !needsAttention(t) && !['ignored','cancelled','stopped'].includes(t.state)).length,
     invited:tasks.reduce((n,t) => n + (t.receipt?.confirmed === true && (t.state === 'invited' || t.receipt.kind === 'invitation') ? t.receipt.invited || 0 : 0), 0)};
 }
 export function filtered(tasks, filters) {
   return tasks.filter(t => (!filters.employee || t.employeeId === filters.employee) && (!filters.group || (t.group || (t.action === 'wall_post' ? 'Wall' : t.action === 'story' ? 'Story' : t.label)) === filters.group)
     && matchesAction(t.action, filters.action)
-    && (filters.status === 'all' || filters.status === 'done' && confirmed(t) || filters.status === 'attention' && ATTENTION.has(t.state)
-      || filters.status === 'waiting' && !confirmed(t) && !ATTENTION.has(t.state)));
+    && (filters.status === 'all' || filters.status === 'done' && confirmed(t) || filters.status === 'attention' && needsAttention(t)
+      || filters.status === 'waiting' && !confirmed(t) && !needsAttention(t)));
 }
 
 function matchesAction(action, filter) {
