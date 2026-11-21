@@ -1,7 +1,10 @@
 import {LABELS,PLAN_LABELS,tasksFor,summary,filtered,tone,taskLabel,ZAZZLE_STATES,zazzlePeriod,SALE_STATES,zazzleSales} from './model.js?v=5';
+import {mountShortlinks} from './shortlinks.js?v=1';
 const $=id=>document.getElementById(id), escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let report=null,config=null,busy=false,filter='all',fetchFailed=false;
 let zazzleView = location.hash === '#zazzle-check-sale' ? 'sales' : 'overview', salesPage = 1;
+const reportTabs = ['facebook', 'zazzle', 'shortlinks'];
+let activeTab = 'facebook';
 try { const saved=localStorage.getItem('socialrun-report-timezone');$('timezone').value=['Asia/Ho_Chi_Minh','America/Halifax'].includes(saved)?saved:'Asia/Ho_Chi_Minh'; } catch {}
 const zone=()=>$('timezone').value, fmt=(at,options={})=>at?new Intl.DateTimeFormat('vi-VN',{timeZone:zone(),...options}).format(new Date(at)):'—';
 const clock=at=>fmt(at,{hour:'2-digit',minute:'2-digit',hourCycle:'h23'}), date=at=>fmt(at,{day:'2-digit',month:'2-digit'}), full=at=>fmt(at,{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
@@ -46,6 +49,7 @@ function renderLog(tasks) {
   }).join(''):empty(tasks.length?'Không có lượt nào khớp bộ lọc.':'Ngày này chưa có công việc.');
 }
 const reportDate = day => day.split('-').reverse().join('/');
+const renderShortlinks = mountShortlinks($('shortlinks-view'), {escape, n, metric, reportDate});
 const sourceWindow = (first, last) => (first && first !== last ? full(first) + ' – ' : '') + full(last);
 const reportCurrency = (cents, currency) => new Intl.NumberFormat('vi-VN', {style:'currency', currency}).format(cents / 100);
 function publicAmounts(amounts, covered, unknown = 0) {
@@ -184,14 +188,21 @@ function renderZazzle() {
   $('zazzle-results').innerHTML = invalidRange ? '' : sales ? renderPublicSales(data, filters) : renderZazzlePeriod(data, filters);
 }
 function showTab(tab) {
-  const zazzle = tab === 'zazzle';
-  $('facebook-view').hidden = $('facebook-day-control').hidden = zazzle;
-  $('zazzle-view').hidden = !zazzle;
-  document.querySelector('.view-only').hidden = zazzle;
-  $('facebook-tab').setAttribute('aria-pressed', String(!zazzle));
-  $('zazzle-tab').setAttribute('aria-pressed', String(zazzle));
-  $('report-title').textContent = zazzle ? 'Báo cáo Zazzle' : 'Nhật ký công việc';
-  $('report-intro').textContent = zazzle ? 'Earnings, Pending và Payment theo ngày.' : 'Tiến độ từng nhân viên. Kết quả từng lượt chạy.';
+  activeTab = tab;
+  for (const name of reportTabs) {
+    $(name + '-view').hidden = name !== tab;
+    $(name + '-tab').setAttribute('aria-pressed', String(name === tab));
+  }
+  $('facebook-day-control').hidden = tab !== 'facebook';
+  document.querySelector('.view-only').hidden = tab === 'zazzle';
+  const [title, intro] = {
+    facebook: ['Nhật ký công việc', 'Tiến độ từng nhân viên. Kết quả từng lượt chạy.'],
+    zazzle: ['Báo cáo Zazzle', 'Earnings, Pending và Payment theo ngày.'],
+    shortlinks: ['Traffic Shortlinks', 'Lượt click, nguồn truy cập và quốc gia theo từng link.'],
+  }[tab];
+  $('report-title').textContent = title;
+  $('report-intro').textContent = intro;
+  if (tab === 'shortlinks') renderShortlinks(report?.shortlinks, zone());
 }
 function render() {
   if(!report)return;
@@ -204,6 +215,7 @@ function render() {
   setOptions($('employee'),[...new Map((day?.employees??[]).map(e=>[e.employeeId,e.employee])).entries()],'Mọi nhân viên');
   setOptions($('group'),[...new Set(tasks.map(t=>t.group||(t.action==='wall_post'?'Wall':t.action==='story'?'Story':t.label)))].sort().map(g=>[g,g]),'Mọi nơi đăng');
   renderLog(tasks);renderZazzle();syncStatus();
+  if (activeTab === 'shortlinks') renderShortlinks(report.shortlinks, zone());
 }
 async function refresh() {
   if(busy)return;busy=true;$('refresh').disabled=true;
@@ -220,8 +232,9 @@ async function refresh() {
   } finally {busy=false;$('refresh').disabled=false;}
 }
 $('refresh').addEventListener('click',refresh);
-for(const tab of ['facebook','zazzle']) $(tab+'-tab').addEventListener('click',()=>{
-  history.replaceState(null,'',tab==='zazzle'?(zazzleView === 'sales' ? '#zazzle-check-sale' : '#zazzle'):location.pathname+location.search);
+for (const tab of reportTabs) $(tab+'-tab').addEventListener('click',()=>{
+  const hash = tab === 'zazzle' && zazzleView === 'sales' ? '#zazzle-check-sale' : '#' + tab;
+  history.replaceState(null,'',tab === 'facebook' ? location.pathname + location.search : hash);
   showTab(tab);
 });
 for (const tab of ['overview', 'sales']) $('zazzle-' + tab + '-tab').addEventListener('click', () => {
@@ -247,13 +260,14 @@ $('clear').addEventListener('click',()=>{$('employee').value='';$('group').value
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 setInterval(()=>{if(!document.hidden)refresh();},30000);
 setInterval(syncStatus,15000);
-window.addEventListener('hashchange', () => {
+function showHash() {
   const tab = location.hash;
   if (tab === '#zazzle' || tab === '#zazzle-check-sale') {
     zazzleView = tab === '#zazzle' ? 'overview' : 'sales';
     showTab('zazzle');
     renderZazzle();
-  } else showTab('facebook');
-});
-showTab(['#zazzle','#zazzle-check-sale'].includes(location.hash)?'zazzle':'facebook');
+  } else showTab(tab === '#shortlinks' ? 'shortlinks' : 'facebook');
+}
+window.addEventListener('hashchange', showHash);
+showHash();
 refresh();
