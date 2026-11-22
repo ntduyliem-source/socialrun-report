@@ -1,6 +1,8 @@
 import {PLAN_LABELS,tasksFor,summary,filtered,tone,taskLabel,inviteProgress,ZAZZLE_STATES,zazzlePeriod,SALE_STATES,zazzleSales} from './model.js?v=6';
+import {createShortlinksReport} from './shortlinks.js?v=1';
 const $=id=>document.getElementById(id), escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let report=null,config=null,busy=false,filter='all',fetchFailed=false;
+const shortlinks = createShortlinksReport(() => report?.shortlinks, () => $('timezone').value);
 let zazzleView = location.hash === '#zazzle-check-sale' ? 'sales' : 'overview', salesPage = 1;
 try { const saved=localStorage.getItem('socialrun-report-timezone');$('timezone').value=['Asia/Ho_Chi_Minh','America/Halifax'].includes(saved)?saved:'Asia/Ho_Chi_Minh'; } catch {}
 const zone=()=>$('timezone').value, fmt=(at,options={})=>at?new Intl.DateTimeFormat('vi-VN',{timeZone:zone(),...options}).format(new Date(at)):'—';
@@ -190,13 +192,17 @@ function renderZazzle() {
 }
 function showTab(tab) {
   const zazzle = tab === 'zazzle';
-  $('facebook-view').hidden = $('facebook-day-control').hidden = zazzle;
+  $('facebook-view').hidden = $('facebook-day-control').hidden = tab !== 'facebook';
   $('zazzle-view').hidden = !zazzle;
+  $('shortlinks-view').hidden = tab !== 'shortlinks';
   document.querySelector('.view-only').hidden = zazzle;
-  $('facebook-tab').setAttribute('aria-pressed', String(!zazzle));
+  $('facebook-tab').setAttribute('aria-pressed', String(tab === 'facebook'));
   $('zazzle-tab').setAttribute('aria-pressed', String(zazzle));
-  $('report-title').textContent = zazzle ? 'Báo cáo Zazzle' : 'Nhật ký công việc';
-  $('report-intro').textContent = zazzle ? 'Earnings, Pending và Payment theo ngày.' : 'Tiến độ từng nhân viên. Kết quả từng lượt chạy.';
+  $('shortlinks-tab').setAttribute('aria-pressed', String(tab === 'shortlinks'));
+  $('report-title').textContent = zazzle ? 'Báo cáo Zazzle' : tab === 'shortlinks' ? 'Traffic Shortlinks' : 'Nhật ký công việc';
+  $('report-intro').textContent = zazzle ? 'Earnings, Pending và Payment theo ngày.' : tab === 'shortlinks'
+    ? 'Lượt click, nguồn truy cập và traffic của từng link.' : 'Tiến độ từng nhân viên. Kết quả từng lượt chạy.';
+  if (tab === 'shortlinks') shortlinks.render();
 }
 function render() {
   if(!report)return;
@@ -209,7 +215,7 @@ function render() {
   setOptions($('employee'),[...new Map((day?.employees??[]).map(e=>[e.employeeId,e.employee])).entries()],'Mọi nhân viên');
   const groupLabels = new Map(tasks.map(t=>[t.group||(t.action==='wall_post'?'Wall':t.action==='story'?'Story':t.label),t.groupContentMissing]));
   setOptions($('group'),[...groupLabels.keys()].sort().map(g=>[g,g+(groupLabels.get(g)?' · Chưa gán kho content':'')]),'Mọi nơi đăng');
-  renderLog(tasks);renderZazzle();syncStatus();
+  renderLog(tasks);renderZazzle();shortlinks.render();syncStatus();
 }
 async function refresh() {
   if(busy)return;busy=true;$('refresh').disabled=true;
@@ -226,8 +232,8 @@ async function refresh() {
   } finally {busy=false;$('refresh').disabled=false;}
 }
 $('refresh').addEventListener('click',refresh);
-for(const tab of ['facebook','zazzle']) $(tab+'-tab').addEventListener('click',()=>{
-  history.replaceState(null,'',tab==='zazzle'?(zazzleView === 'sales' ? '#zazzle-check-sale' : '#zazzle'):location.pathname+location.search);
+for(const tab of ['facebook','zazzle','shortlinks']) $(tab+'-tab').addEventListener('click',()=>{
+  history.replaceState(null,'',tab==='shortlinks'?'#shortlinks':tab==='zazzle'?(zazzleView === 'sales' ? '#zazzle-check-sale' : '#zazzle'):location.pathname+location.search);
   showTab(tab);
 });
 for (const tab of ['overview', 'sales']) $('zazzle-' + tab + '-tab').addEventListener('click', () => {
@@ -259,7 +265,7 @@ window.addEventListener('hashchange', () => {
     zazzleView = tab === '#zazzle' ? 'overview' : 'sales';
     showTab('zazzle');
     renderZazzle();
-  } else showTab('facebook');
+  } else showTab(tab === '#shortlinks' ? 'shortlinks' : 'facebook');
 });
-showTab(['#zazzle','#zazzle-check-sale'].includes(location.hash)?'zazzle':'facebook');
+showTab(location.hash === '#shortlinks' ? 'shortlinks' : ['#zazzle','#zazzle-check-sale'].includes(location.hash)?'zazzle':'facebook');
 refresh();

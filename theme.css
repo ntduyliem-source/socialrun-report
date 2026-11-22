@@ -1,4 +1,19 @@
 :root { color-scheme: light; }
+.shortlinks-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.shortlinks-summary .metric-number{display:block}
+#shortlinks-view .zazzle-filters{display:flex;flex-wrap:wrap;gap:14px;max-width:none}
+#shortlinks-view .zazzle-filters label{flex:0 1 205px}#shortlinks-view .zazzle-filters label:last-child{flex:1 1 280px;max-width:520px}
+#shortlinks-view :is(input,select,table){font-family:inherit}#shortlinks-view .report-table table{font-size:12px}
+.shortlinks-periods{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px}
+.shortlinks-breakdowns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.shortlinks-breakdown{min-width:0}.shortlinks-dimension{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 12px;margin:14px 0;font-size:12px}
+.shortlinks-dimension>span{overflow-wrap:anywhere}.shortlinks-dimension>i{grid-column:1/-1;height:4px;background:var(--line);border-radius:4px;overflow:hidden}
+.shortlinks-dimension>i:after{content:'';display:block;width:var(--traffic-width);height:100%;background:var(--green)}
+.shortlinks-timeline{display:flex;align-items:stretch;gap:9px;height:165px;overflow-x:auto;padding:8px 0}
+.shortlinks-timeline>div{display:grid;grid-template-rows:22px minmax(0,1fr) 20px;justify-items:center;align-items:end;flex:1;min-width:28px;font-size:10px}
+.shortlinks-timeline i{width:100%;min-height:1px;height:var(--traffic-height);background:var(--green);border-radius:3px 3px 0 0;opacity:.75}
+.shortlinks-timeline b{font-weight:500}.shortlinks-timeline small{font-size:9px;color:var(--muted)}
+#shortlinks-view .report-table button{text-align:left;overflow-wrap:anywhere;white-space:normal}
+@media(max-width:700px){.shortlinks-breakdowns{grid-template-columns:1fr;gap:0}.shortlinks-summary{gap:7px}.shortlinks-summary .metric{padding:12px 9px}.shortlinks-summary .metric-number{font-size:24px}}
 .header-actions { display: flex; align-items: center; gap: 12px; }
 .theme-toggle { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid #dce3d7; border-radius: 10px; background: #fff; color: #52674e; }
 .theme-toggle:hover { background: #edf2e8; }
