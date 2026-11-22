@@ -109,33 +109,3 @@
   .report-table table { font-size: 11px; }
   .report-table :is(th,td) { padding: 9px; }
 }
-
-.shortlinks-status { margin: 18px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.shortlinks-date-window { margin-top: 18px; }
-.shortlinks-date-window h2 { font-size: 15px; margin: 0 0 12px; }
-.shortlinks-date-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; }
-.shortlinks-date-bar .zazzle-filters { flex: 1 1 280px; max-width: 320px; }
-.shortlinks-date-bar .shortlinks-date-presets { margin: 0 0 2px; max-width: 100%; }
-.shortlinks-layout { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 24px; }
-.shortlinks-list .report-table { max-height: 526px; }
-.shortlinks-search { width: 100%; margin-bottom: 10px; background: var(--paper); color: inherit; font: inherit; font-size: 12px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; }
-.shortlinks-search:focus-visible, .shortlinks-traffic h2:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
-.shortlinks-layout td:last-child, .shortlinks-list thead th:last-child { width: 1%; text-align: right; white-space: nowrap; }
-.shortlinks-layout .report-table :is(th, td) { overflow-wrap: anywhere; }
-.shortlinks-row { width: 100%; text-align: left; font-family: inherit; font-size: inherit; overflow-wrap: anywhere; color: var(--green); }
-.shortlinks-row[aria-pressed='true'] { font-weight: 700; }
-.shortlinks-list tr:has(.shortlinks-row[aria-pressed='true']) { background: color-mix(in srgb, var(--green) 9%, var(--paper)); }
-.shortlinks-list thead th { position: sticky; z-index: 1; top: 0; background: var(--paper); }
-.shortlinks-list thead button { color: inherit; font-weight: 650; }
-.shortlinks-list [aria-sort='ascending'] button::after { content: ' ↑'; }
-.shortlinks-list [aria-sort='descending'] button::after { content: ' ↓'; }
-.shortlinks-breakdown-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.shortlinks-breakdown { min-width: 0; }
-.shortlinks-breakdown h3 { margin: 0 0 7px; font-size: 12px; font-weight: 650; }
-.shortlinks-breakdown th { font-weight: 500; }
-.shortlinks-selected { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12px; margin: 0 0 13px; }
-.shortlinks-traffic h2 { overflow-wrap: anywhere; }
-@media (max-width: 760px) {
-  .shortlinks-layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
-  .shortlinks-list .report-table { max-height: 350px; }
-}

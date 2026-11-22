@@ -12,8 +12,8 @@
   <title>SocialRun · Report</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <script src="theme.js"></script>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="theme.css?v=5">
+  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="theme.css?v=3">
   <script type="module" src="app.js?v=8"></script>
 </head>
 <body>
@@ -21,7 +21,7 @@
   <main>
     <section class="page-heading"><div><p class="eyebrow">THEO DÕI VẬN HÀNH</p><h1><span id="report-title">Nhật ký công việc</span><span class="heading-dot">.</span></h1><p class="intro" id="report-intro">Tiến độ từng nhân viên. Kết quả từng lượt chạy.</p></div><button id="refresh" class="refresh" type="button"><span aria-hidden="true">↻</span> Làm mới</button></section>
     <div id="sync" class="sync" role="status" aria-live="polite"><span class="sync-dot"></span><span>Đang tải report…</span></div>
-    <nav class="report-tabs" aria-label="Loại report"><button id="facebook-tab" type="button" aria-pressed="true" aria-controls="facebook-view">Facebook</button><button id="zazzle-tab" type="button" aria-pressed="false" aria-controls="zazzle-view">Zazzle</button><button id="shortlinks-tab" type="button" aria-pressed="false" aria-controls="shortlinks-view">Shortlinks</button></nav>
+    <nav class="report-tabs" aria-label="Loại report"><button id="facebook-tab" type="button" aria-pressed="true" aria-controls="facebook-view">Facebook</button><button id="zazzle-tab" type="button" aria-pressed="false" aria-controls="zazzle-view">Zazzle</button></nav>
     <section class="toolbar" aria-label="Chọn ngày và múi giờ"><label class="date-control" id="facebook-day-control">Ngày lịch<select id="day" aria-label="Ngày lịch"></select></label><label class="timezone-control">Giờ hiển thị<select id="timezone" aria-label="Múi giờ"><option value="Asia/Ho_Chi_Minh">Việt Nam · UTC+7</option><option value="America/Halifax">Máy chạy · Halifax</option></select></label></section>
     <div id="error" class="error" role="alert" hidden></div>
     <div id="facebook-view">
@@ -73,44 +73,6 @@
         <p id="zazzle-request" class="section-note" role="status" hidden></p>
         <p id="zazzle-control-help" class="section-note" hidden>Đăng nhập GitHub bằng tài khoản chủ repo, bấm <b>Run workflow</b> và chọn thao tác. Worker nhận lệnh khi SocialRun đang chạy.</p>
       </section>
-    </div>
-    <div id="shortlinks-view" hidden>
-      <p id="shortlinks-status" class="shortlinks-status" role="status">Đang tải số liệu Shortlinks…</p>
-      <div id="shortlinks-data" hidden>
-        <section id="shortlinks-date-window" class="shortlinks-date-window" aria-labelledby="shortlinks-date-title" hidden>
-          <h2 id="shortlinks-date-title">Khoảng ngày</h2>
-          <div class="shortlinks-date-bar">
-            <div class="zazzle-filters">
-              <label>Từ ngày<input id="shortlinks-start" type="date"></label>
-              <label>Đến ngày<input id="shortlinks-end" type="date"></label>
-            </div>
-            <div class="status-filters shortlinks-date-presets" role="group" aria-label="Chọn nhanh khoảng ngày">
-              <button type="button" data-traffic-days="1" aria-pressed="false">Hôm nay</button>
-              <button type="button" data-traffic-days="7" aria-pressed="false">7 ngày</button>
-              <button type="button" data-traffic-days="30" aria-pressed="false">30 ngày</button>
-              <button type="button" data-traffic-days="all" aria-pressed="false">Tất cả</button>
-            </div>
-          </div>
-          <p id="shortlinks-date-error" class="error" role="alert" hidden></p>
-        </section>
-        <div id="shortlinks-results">
-        <div id="shortlinks-summary" class="summary" aria-label="Tổng quan traffic"></div>
-        <div class="shortlinks-layout">
-          <section class="section shortlinks-list" aria-labelledby="shortlinks-list-title">
-            <div class="section-heading"><h2 id="shortlinks-list-title">Shortlinks <span id="shortlinks-count" class="count"></span></h2></div>
-            <label class="sr-only" for="shortlinks-search">Tìm theo tên shortlink</label>
-            <input class="shortlinks-search" id="shortlinks-search" type="search" placeholder="Tìm shortlink…">
-            <div class="report-table" tabindex="0" aria-label="Bảng lượt click theo shortlink">
-              <table><thead><tr><th scope="col" aria-sort="none"><button class="text-button" type="button" data-traffic-sort="slug" aria-label="Sắp xếp theo shortlink">Shortlink</button></th><th scope="col" aria-sort="descending"><button class="text-button" type="button" data-traffic-sort="clicks" aria-label="Sắp xếp theo lượt click">Click</button></th></tr></thead><tbody id="shortlinks-rows"></tbody></table>
-            </div>
-          </section>
-          <section class="section shortlinks-traffic" aria-labelledby="shortlinks-traffic-title">
-            <div class="section-heading"><h2 id="shortlinks-traffic-title" tabindex="-1">Nguồn và thời gian</h2><button id="shortlinks-clear" class="text-button" type="button" hidden>Tất cả link</button></div>
-            <div id="shortlinks-breakdowns"></div>
-          </section>
-        </div>
-        </div>
-      </div>
     </div>
     <footer><span class="footer-brand">SocialRun <span>↗</span></span><p>Ngày lịch theo máy chạy; giờ từng lượt theo múi giờ đã chọn.<br>Report tự làm mới mỗi 30 giây. Kết quả mới có thể trễ vài phút do bộ nhớ đệm GitHub.</p><span id="snapshot-time"></span></footer>
   </main>

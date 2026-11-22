@@ -1,6 +1,6 @@
 export const DONE = new Set(['published', 'pending_approval', 'invited', 'boundary', 'surveyed', 'commented']);
 export const ATTENTION = new Set(['failed', 'partial', 'unverified', 'skipped']);
-export const LABELS = {pending:'Chờ đến giờ',running:'Đang chạy',published:'Đã đăng',pending_approval:'Chờ duyệt',invited:'Đã mời',commented:'Đã xác minh bình luận',failed:'Lỗi',partial:'Chưa xong',unverified:'Chưa xác minh',stopped:'Đã dừng',cancelled:'Đã hủy',skipped:'Quá giờ',ignored:'Bỏ qua',boundary:'Đã chạy thử',surveyed:'Đã khảo sát'};
+export const LABELS = {pending:'Chờ đến giờ',running:'Đang chạy',published:'Đã đăng',pending_approval:'Chờ duyệt',invited:'Đã mời',commented:'Đã đăng bình luận',failed:'Worker báo lỗi',partial:'Còn phần chưa thực hiện',unverified:'Thiếu biên nhận gửi',stopped:'Đã dừng',cancelled:'Đã hủy',skipped:'Đã qua giờ chạy',ignored:'Bỏ qua',boundary:'Đã chạy thử',surveyed:'Đã khảo sát'};
 export const PLAN_LABELS = {planned:'Chưa bật',armed:'Đang chờ lịch',running:'Đang chạy',paused:'Tạm dừng',stopping:'Đang dừng',stopped:'Đã dừng',attention:'Cần kiểm tra',completed:'Đã kết thúc',completed_with_pending:'Còn việc chưa xong'};
 function followExhausted(task) {
   const r=task.receipt;
@@ -9,18 +9,27 @@ function followExhausted(task) {
     && r.shortfall>0 && r.shortfall===r.requested-r.verified;
 }
 export function taskLabel(task) {
+  if (task.outcome?.label) return task.outcome.label;
   if (followExhausted(task)) {
     const {receipt}=task;
     return receipt.sourceScope==='selection' ? 'Đã kiểm hết link đã chọn' : 'Hết người mời';
   }
-  if (task.state === 'unverified' && task.recovery?.state === 'reconcile') {
-    return task.planState === 'paused' ? 'Tạm dừng kiểm tra' : 'Chờ kiểm tra bài đã gửi';
-  }
-  if (task.state === 'partial' && task.followCheck?.verified > 0) return 'Đã mời một phần';
+  if (task.statusDetail?.startsWith('Đang dừng')) return 'Đang dừng';
+  if (task.statusDetail?.startsWith('Đã dừng')) return 'Đã dừng';
   return LABELS[task.state] || task.state;
 }
-function needsAttention(task) { return ATTENTION.has(task.state) && task.recovery?.state !== 'reconcile'; }
-export function confirmed(task) { return DONE.has(task.state) && (['boundary','surveyed'].includes(task.state) || task.receipt?.confirmed === true); }
+export function inviteProgress(task) {
+  if (task.invitationProgress) return task.invitationProgress;
+  if (!task.action?.startsWith('invite_') && task.receipt?.kind !== 'invitation') return null;
+  const r = task.receipt;
+  const verified = r?.confirmed ? r.verified ?? 0 : task.followCheck?.verified ?? 0;
+  const invited = r?.confirmed ? r.invited ?? verified : verified;
+  return {invited, requested:r?.requested ?? task.quantity ?? 0, verified,
+    accepted:r?.confirmed ? r.acceptedSampleCount ?? Math.max(0, invited - verified) : 0};
+}
+export function confirmed(task) {
+  return task.outcome?.kind === 'exhausted' || DONE.has(task.state) && (['boundary','surveyed'].includes(task.state) || task.receipt?.confirmed === true);
+}
 export function tasksFor(day) {
   return (day?.employees ?? []).flatMap(employee => employee.tasks.map(task => ({...task,
     ...(followExhausted(task) ? {state:'invited',errorCode:''} : {}),
@@ -29,15 +38,15 @@ export function tasksFor(day) {
 }
 export function summary(tasks) {
   return {total:tasks.length, done:tasks.filter(confirmed).length, approval:tasks.filter(t => confirmed(t) && t.state === 'pending_approval').length,
-    attention:tasks.filter(needsAttention).length, running:tasks.filter(t => t.state === 'running').length,
-    waiting:tasks.filter(t => !confirmed(t) && !needsAttention(t) && !['ignored','cancelled','stopped'].includes(t.state)).length,
-    invited:tasks.reduce((n,t) => n + (t.receipt?.confirmed === true && (t.state === 'invited' || t.receipt.kind === 'invitation') ? t.receipt.invited || 0 : 0), 0)};
+    attention:tasks.filter(t => !confirmed(t) && ATTENTION.has(t.state)).length, running:tasks.filter(t => t.state === 'running').length,
+    waiting:tasks.filter(t => !confirmed(t) && !ATTENTION.has(t.state) && !['ignored','cancelled','stopped'].includes(t.state)).length,
+    invited:tasks.reduce((n,t) => n + (inviteProgress(t)?.invited ?? (t.state === 'invited' && t.receipt?.confirmed ? t.receipt.invited ?? 0 : 0)), 0)};
 }
 export function filtered(tasks, filters) {
   return tasks.filter(t => (!filters.employee || t.employeeId === filters.employee) && (!filters.group || (t.group || (t.action === 'wall_post' ? 'Wall' : t.action === 'story' ? 'Story' : t.label)) === filters.group)
     && matchesAction(t.action, filters.action)
-    && (filters.status === 'all' || filters.status === 'done' && confirmed(t) || filters.status === 'attention' && needsAttention(t)
-      || filters.status === 'waiting' && !confirmed(t) && !needsAttention(t)));
+    && (filters.status === 'all' || filters.status === 'done' && confirmed(t) || filters.status === 'attention' && !confirmed(t) && ATTENTION.has(t.state)
+      || filters.status === 'waiting' && !confirmed(t) && !ATTENTION.has(t.state)));
 }
 
 function matchesAction(action, filter) {

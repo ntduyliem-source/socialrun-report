@@ -1,15 +1,13 @@
-import {LABELS,PLAN_LABELS,tasksFor,summary,filtered,tone,taskLabel,ZAZZLE_STATES,zazzlePeriod,SALE_STATES,zazzleSales} from './model.js?v=6';
-import {mountShortlinks} from './shortlinks.js?v=2';
+import {PLAN_LABELS,tasksFor,summary,filtered,tone,taskLabel,inviteProgress,ZAZZLE_STATES,zazzlePeriod,SALE_STATES,zazzleSales} from './model.js?v=6';
 const $=id=>document.getElementById(id), escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let report=null,config=null,busy=false,filter='all',fetchFailed=false;
 let zazzleView = location.hash === '#zazzle-check-sale' ? 'sales' : 'overview', salesPage = 1;
-const reportTabs = ['facebook', 'zazzle', 'shortlinks'];
-let activeTab = 'facebook';
 try { const saved=localStorage.getItem('socialrun-report-timezone');$('timezone').value=['Asia/Ho_Chi_Minh','America/Halifax'].includes(saved)?saved:'Asia/Ho_Chi_Minh'; } catch {}
 const zone=()=>$('timezone').value, fmt=(at,options={})=>at?new Intl.DateTimeFormat('vi-VN',{timeZone:zone(),...options}).format(new Date(at)):'—';
 const clock=at=>fmt(at,{hour:'2-digit',minute:'2-digit',hourCycle:'h23'}), date=at=>fmt(at,{day:'2-digit',month:'2-digit'}), full=at=>fmt(at,{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 const n=value=>Number(value||0).toLocaleString('vi-VN'), badge=task=>`<span class="badge ${tone(task.state)}">${escape(taskLabel(task))}</span>`;
 const empty=message=>`<div class="empty">${escape(message)}</div>`;
+const groupLabel=task=>task.groupContentMissing ? `<span class="group-ghost"><span>${escape(task.group)}</span> <span class="group-ghost-badge"><span aria-hidden="true">⚠</span> Chưa gán kho content</span></span>` : escape(task.group);
 function setOptions(el,items,defaultLabel) {
   const previous=el.value;
   el.innerHTML=(defaultLabel?`<option value="">${escape(defaultLabel)}</option>`:'')+items.map(([value,label])=>`<option value="${escape(value)}">${escape(label)}</option>`).join('');
@@ -29,7 +27,7 @@ function renderEmployees(day) {
   $('employees').innerHTML=employees.length?employees.map(employee=>{
     const stats=summary(employee.tasks),roles=[...new Set(employee.tasks.map(t=>t.role))],next=employee.tasks.find(t=>t.state==='running')||employee.tasks.find(t=>t.state==='pending'),initials=employee.employee.split(/\s+/).filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase();
     const label=employee.state==='completed'&&stats.done<stats.total?'Đã kết thúc · còn lượt chưa xong':PLAN_LABELS[employee.state]||'Cần kiểm tra';
-    return `<article class="employee"><div class="employee-top"><span class="initials">${escape(initials)}</span><div><div class="employee-name">${escape(employee.employee)}</div><div class="employee-roles">${escape(roles.join(' · '))}</div></div><div class="employee-progress">${n(stats.done)}<small>/${n(stats.total)}</small></div></div><div class="progress-track" role="progressbar" aria-label="Tiến độ ${escape(employee.employee)}" aria-valuenow="${stats.done}" aria-valuemin="0" aria-valuemax="${stats.total}"><span style="width:${stats.total?stats.done/stats.total*100:0}%"></span></div><div class="employee-bottom"><span class="badge ${stats.attention?'warm':employee.state==='running'?'running':employee.state==='completed'&&stats.done===stats.total?'good':''}">${escape(label)}</span><span>${stats.invited?`${n(stats.invited)} lời mời`:stats.attention?`${n(stats.attention)} lượt cần xem`:stats.approval?`${n(stats.approval)} chờ duyệt`:'Đã xác nhận '+n(stats.done)+' lượt'}</span></div>${next?`<div class="employee-next"><b>${next.state==='running'?'Đang chạy':'Tiếp theo'} · ${escape(clock(next.scheduledAt))}</b> &nbsp;${escape(next.label)}${next.group?' · '+escape(next.group):''}</div>`:''}</article>`;
+    return `<article class="employee"><div class="employee-top"><span class="initials">${escape(initials)}</span><div><div class="employee-name">${escape(employee.employee)}</div><div class="employee-roles">${escape(roles.join(' · '))}</div></div><div class="employee-progress">${n(stats.done)}<small>/${n(stats.total)}</small></div></div><div class="progress-track" role="progressbar" aria-label="Tiến độ ${escape(employee.employee)}" aria-valuenow="${stats.done}" aria-valuemin="0" aria-valuemax="${stats.total}"><span style="width:${stats.total?stats.done/stats.total*100:0}%"></span></div><div class="employee-bottom"><span class="badge ${stats.attention?'warm':employee.state==='running'?'running':employee.state==='completed'&&stats.done===stats.total?'good':''}">${escape(label)}</span><span>${stats.invited?`${n(stats.invited)} lời mời`:stats.attention?`${n(stats.attention)} lượt cần xem`:stats.approval?`${n(stats.approval)} chờ duyệt`:'Đã xác nhận '+n(stats.done)+' lượt'}</span></div>${next?`<div class="employee-next"><b>${next.state==='running'?'Đang chạy':'Tiếp theo'} · ${escape(clock(next.scheduledAt))}</b> &nbsp;${escape(next.label)}${next.group?' · '+groupLabel(next):''}</div>`:''}</article>`;
   }).join(''):empty('Chưa có lịch chạy trong ngày này.');
 }
 function renderLog(tasks) {
@@ -37,26 +35,22 @@ function renderLog(tasks) {
   $('clear').hidden=!filters.employee&&!filters.group&&!filters.action&&filter==='all';
   $('log-count').textContent=rows.length===tasks.length?n(rows.length):`${n(rows.length)}/${n(tasks.length)}`;
   $('log').innerHTML=rows.length?rows.map(t=>{
-    const r=t.receipt||{},target=t.group||(t.action==='wall_post'?'Wall':t.action==='story'?'Story':''),invite=r.confirmed&&r.kind==='invitation';
-    let note=t.state==='unverified'?'Chưa đủ bằng chứng xác nhận; chương trình giữ lượt này để đối soát.':t.state==='skipped'?'Đã qua khung giờ, chưa thực hiện thành công.':t.state==='failed'?'Lượt chạy có lỗi. Chi tiết chẩn đoán được giữ trên máy chạy.':t.state==='pending_approval'?'Đã gửi bài thành công, đang chờ quản trị viên group duyệt.':t.state==='published'?'Worker đã xác nhận bài được đăng.':t.state==='ignored'?'Lượt này được bỏ qua theo lựa chọn trong lịch.':'';
-    if(invite){
-      const accepted=r.acceptedSampleCount??(r.acceptedBySample?r.invited-r.verified:0);
-      const reconciliation=t.state==='unverified'?' Phần chưa rõ đang chờ đối soát.':'';
-      note=`Đã mời ${n(r.invited)} người · ${n(r.verified)} xác minh trực tiếp${accepted?` · ${n(accepted)} theo lô`:''}.${r.queueExhausted?' Đã hết người đủ điều kiện trong các link đã kiểm.':''}${r.shortfall?` Thiếu ${n(r.shortfall)} so với quota.`:''}${reconciliation}`;
+    const r=t.receipt||{},target=t.group||(t.action==='wall_post'?'Wall':t.action==='story'?'Story':''),invite=inviteProgress(t);
+    const notes = [t.outcome?.detail ?? (t.outcome ? '' : t.statusDetail)];
+    if (invite) {
+      notes.push(`${n(invite.invited)}/${n(invite.requested)} lời mời · ${n(invite.verified)} kiểm trực tiếp${invite.accepted ? ' · '+n(invite.accepted)+' theo lô' : ''}`);
+      if (!invite.batch && invite.unresolved) notes.push(`${n(invite.unresolved)} thao tác gửi chưa có phản hồi.`);
     }
+    if (invite?.skipped || t.followCheck?.skipped) notes.push(`Bỏ qua ${n(invite?.skipped ?? t.followCheck.skipped)} người.`);
+    const chat = t.chatDelivery;
+    if (chat) notes.push(({sent:'Đã gửi chat',queued:'Đang chờ gửi chat',error:'Gửi chat lỗi',cancelled:'Đã hủy gửi chat',not_sent:'Chưa gửi chat'})[chat.state] +
+      (chat.state === 'sent' && chat.at ? ' · '+full(chat.at) : ''));
+    const note = notes.filter(Boolean).join(' · ');
     const safeUrl=r.url&&/^https:\/\/www\.facebook\.com\//.test(r.url)?r.url:'';
-    if (t.state === 'unverified' && t.recovery?.state === 'reconcile') {
-      note = t.planState === 'paused' ? 'Lịch đang Pause. Lượt kiểm tra chờ lịch hoạt động trở lại.' :
-        `Worker sẽ kiểm tra bài đã gửi${t.recovery.dueAt ? ' từ ' + full(t.recovery.dueAt) : ''}.`;
-    }
-    if (t.state === 'partial' && t.followCheck?.verified > 0) {
-      note = `Đã xác minh ${n(t.followCheck.verified)}/${n(t.quantity)} lời mời.`;
-    }
-    return `<details class="log-row" data-id="${escape(t.id)}" data-tone="${tone(t.state)==='running'?'':tone(t.state)}"${opened.has(t.id)?' open':''}><summary><time class="log-time" datetime="${escape(t.scheduledAt)}">${escape(clock(t.scheduledAt))}<small class="log-day">${escape(date(t.scheduledAt))}</small></time><div class="log-main"><div class="log-title">${escape(t.employee)} <span class="log-role">/ ${escape(t.role)}</span></div><div class="log-description">${escape(t.label)}${target?' · '+escape(target):''}${invite?' · '+n(r.invited)+' người':''}</div></div><div class="log-outcome">${badge(t)}<span class="expand-arrow" aria-hidden="true">⌄</span></div></summary><div class="log-detail"><div class="detail-item">Thiết bị<strong>${t.engine==='chrome'?'Chrome':t.engine==='ldplayer'?'LDPlayer':'—'}</strong></div><div class="detail-item">Khung giờ<strong>${escape(clock(t.scheduledAt))} – ${escape(clock(t.endsAt))}</strong></div><div class="detail-item">Số lượng<strong>${n(t.quantity)} ${t.action.startsWith('invite_')?'người':'lượt'}</strong></div><div class="detail-item">Số lần chạy<strong>${n(t.attempts)}</strong></div>${t.attempts?`<div class="detail-item">Ghi nhận gần nhất<strong>${escape(full(t.updatedAt))}</strong></div>`:''}${note?`<p class="detail-note">${escape(note)}</p>`:''}${t.errorCode?`<p class="detail-note">Mã lỗi: ${escape(t.errorCode)}</p>`:''}${safeUrl?`<a class="post-link" href="${escape(safeUrl)}" target="_blank" rel="noopener noreferrer">Xem bài trên Facebook ↗</a>`:''}</div></details>`;
+   return `<details class="log-row${t.groupContentMissing ? ' group-ghost-row' : ''}" data-id="${escape(t.id)}" data-tone="${tone(t.state)==='running'?'':tone(t.state)}"${opened.has(t.id)?' open':''}><summary><time class="log-time" datetime="${escape(t.scheduledAt)}">${escape(clock(t.scheduledAt))}<small class="log-day">${escape(date(t.scheduledAt))}</small></time><div class="log-main"><div class="log-title">${escape(t.employee)} <span class="log-role">/ ${escape(t.role)}</span></div><div class="log-description">${escape(t.label)}${target?' · '+(t.group ? groupLabel(t) : escape(target)):''}${invite?' · '+n(invite.invited)+'/'+n(invite.requested)+' lời mời':''}</div></div><div class="log-outcome">${badge(t)}<span class="expand-arrow" aria-hidden="true">⌄</span></div></summary><div class="log-detail"><div class="detail-item">Thiết bị<strong>${t.engine==='chrome'?'Chrome':t.engine==='ldplayer'?'LDPlayer':'—'}</strong></div><div class="detail-item">Khung giờ<strong>${escape(clock(t.scheduledAt))} – ${escape(clock(t.endsAt))}</strong></div><div class="detail-item">Số lượng<strong>${n(t.quantity)} ${t.action.startsWith('invite_')?'người':'lượt'}</strong></div><div class="detail-item">Số lần chạy<strong>${n(t.attempts)}</strong></div>${t.attempts?`<div class="detail-item">Ghi nhận gần nhất<strong>${escape(full(t.updatedAt))}</strong></div>`:''}${note?`<p class="detail-note">${escape(note)}</p>`:''}${t.errorCode?`<p class="detail-note">Mã lỗi: ${escape(t.errorCode)}</p>`:''}${safeUrl?`<a class="post-link" href="${escape(safeUrl)}" target="_blank" rel="noopener noreferrer">Xem bài trên Facebook ↗</a>`:''}</div></details>`;
   }).join(''):empty(tasks.length?'Không có lượt nào khớp bộ lọc.':'Ngày này chưa có công việc.');
 }
 const reportDate = day => day.split('-').reverse().join('/');
-const renderShortlinks = mountShortlinks($('shortlinks-view'), {escape, n, metric, reportDate});
 const sourceWindow = (first, last) => (first && first !== last ? full(first) + ' – ' : '') + full(last);
 const reportCurrency = (cents, currency) => new Intl.NumberFormat('vi-VN', {style:'currency', currency}).format(cents / 100);
 function publicAmounts(amounts, covered, unknown = 0) {
@@ -195,21 +189,14 @@ function renderZazzle() {
   $('zazzle-results').innerHTML = invalidRange ? '' : sales ? renderPublicSales(data, filters) : renderZazzlePeriod(data, filters);
 }
 function showTab(tab) {
-  activeTab = tab;
-  for (const name of reportTabs) {
-    $(name + '-view').hidden = name !== tab;
-    $(name + '-tab').setAttribute('aria-pressed', String(name === tab));
-  }
-  $('facebook-day-control').hidden = tab !== 'facebook';
-  document.querySelector('.view-only').hidden = tab === 'zazzle';
-  const [title, intro] = {
-    facebook: ['Nhật ký công việc', 'Tiến độ từng nhân viên. Kết quả từng lượt chạy.'],
-    zazzle: ['Báo cáo Zazzle', 'Earnings, Pending và Payment theo ngày.'],
-    shortlinks: ['Traffic Shortlinks', 'Lượt click, nguồn truy cập và quốc gia theo từng link.'],
-  }[tab];
-  $('report-title').textContent = title;
-  $('report-intro').textContent = intro;
-  if (tab === 'shortlinks') renderShortlinks(report?.shortlinks, zone());
+  const zazzle = tab === 'zazzle';
+  $('facebook-view').hidden = $('facebook-day-control').hidden = zazzle;
+  $('zazzle-view').hidden = !zazzle;
+  document.querySelector('.view-only').hidden = zazzle;
+  $('facebook-tab').setAttribute('aria-pressed', String(!zazzle));
+  $('zazzle-tab').setAttribute('aria-pressed', String(zazzle));
+  $('report-title').textContent = zazzle ? 'Báo cáo Zazzle' : 'Nhật ký công việc';
+  $('report-intro').textContent = zazzle ? 'Earnings, Pending và Payment theo ngày.' : 'Tiến độ từng nhân viên. Kết quả từng lượt chạy.';
 }
 function render() {
   if(!report)return;
@@ -217,12 +204,12 @@ function render() {
   setOptions($('day'),report.days.map(day=>[day.date,day.date.split('-').reverse().join('/')]));
   if(!previous&&report.days.length)$('day').value=report.days[0].date;
   const day=report.days.find(d=>d.date===$('day').value),tasks=tasksFor(day),s=summary(tasks);
-  $('summary').innerHTML=metric('ĐÃ XÁC NHẬN',`${n(s.done)}<small>/ ${n(s.total)} lượt</small>`,s.invited?`${n(s.invited)} lời mời đã xác nhận`:'Tính cả bài đã gửi, đang chờ duyệt')+metric('ĐANG CHỜ DUYỆT',n(s.approval),'Bài đã gửi vào group',s.approval?'warning':'')+metric('CẦN XỬ LÝ',n(s.attention),'Lỗi, chưa rõ kết quả hoặc quá giờ',s.attention?'alert':'')+metric('ĐANG CHẠY',n(s.running),`${n(s.waiting)} lượt chưa hoàn tất`);
+  $('summary').innerHTML=metric('ĐÃ HOÀN TẤT',`${n(s.done)}<small>/ ${n(s.total)} lượt</small>`,s.invited?`${n(s.invited)} lời mời đã xác nhận`:'Tính cả bài đã gửi và đang chờ duyệt')+metric('ĐANG CHỜ DUYỆT',n(s.approval),'Bài đã gửi vào group',s.approval?'warning':'')+metric('CẦN XỬ LÝ',n(s.attention),'Xem lý do của mỗi lượt',s.attention?'alert':'')+metric('ĐANG CHẠY',n(s.running),`${n(s.waiting)} lượt chưa hoàn tất`);
   renderEmployees(day);
   setOptions($('employee'),[...new Map((day?.employees??[]).map(e=>[e.employeeId,e.employee])).entries()],'Mọi nhân viên');
-  setOptions($('group'),[...new Set(tasks.map(t=>t.group||(t.action==='wall_post'?'Wall':t.action==='story'?'Story':t.label)))].sort().map(g=>[g,g]),'Mọi nơi đăng');
+  const groupLabels = new Map(tasks.map(t=>[t.group||(t.action==='wall_post'?'Wall':t.action==='story'?'Story':t.label),t.groupContentMissing]));
+  setOptions($('group'),[...groupLabels.keys()].sort().map(g=>[g,g+(groupLabels.get(g)?' · Chưa gán kho content':'')]),'Mọi nơi đăng');
   renderLog(tasks);renderZazzle();syncStatus();
-  if (activeTab === 'shortlinks') renderShortlinks(report.shortlinks, zone());
 }
 async function refresh() {
   if(busy)return;busy=true;$('refresh').disabled=true;
@@ -239,9 +226,8 @@ async function refresh() {
   } finally {busy=false;$('refresh').disabled=false;}
 }
 $('refresh').addEventListener('click',refresh);
-for (const tab of reportTabs) $(tab+'-tab').addEventListener('click',()=>{
-  const hash = tab === 'zazzle' && zazzleView === 'sales' ? '#zazzle-check-sale' : '#' + tab;
-  history.replaceState(null,'',tab === 'facebook' ? location.pathname + location.search : hash);
+for(const tab of ['facebook','zazzle']) $(tab+'-tab').addEventListener('click',()=>{
+  history.replaceState(null,'',tab==='zazzle'?(zazzleView === 'sales' ? '#zazzle-check-sale' : '#zazzle'):location.pathname+location.search);
   showTab(tab);
 });
 for (const tab of ['overview', 'sales']) $('zazzle-' + tab + '-tab').addEventListener('click', () => {
@@ -267,14 +253,13 @@ $('clear').addEventListener('click',()=>{$('employee').value='';$('group').value
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 setInterval(()=>{if(!document.hidden)refresh();},30000);
 setInterval(syncStatus,15000);
-function showHash() {
+window.addEventListener('hashchange', () => {
   const tab = location.hash;
   if (tab === '#zazzle' || tab === '#zazzle-check-sale') {
     zazzleView = tab === '#zazzle' ? 'overview' : 'sales';
     showTab('zazzle');
     renderZazzle();
-  } else showTab(tab === '#shortlinks' ? 'shortlinks' : 'facebook');
-}
-window.addEventListener('hashchange', showHash);
-showHash();
+  } else showTab('facebook');
+});
+showTab(['#zazzle','#zazzle-check-sale'].includes(location.hash)?'zazzle':'facebook');
 refresh();
