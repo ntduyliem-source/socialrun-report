@@ -5,3 +5,14 @@
 [data-theme="dark"] .group-ghost { color: #c4cbd4; }
 [data-theme="dark"] .group-ghost-badge { background: #412e1c; color: #ffd89a; border-color: #ae8549; }
 [data-theme="dark"] .log-row.group-ghost-row summary { background: #28343e; }
+
+.employee-section > summary{cursor:pointer;list-style:none}
+.employee-section > summary::-webkit-details-marker{display:none}
+.employee-section > summary .section-note::after{content:'▸';display:inline-block;margin-left:8px}
+.employee-section[open] > summary .section-note::after{transform:rotate(90deg)}
+.follow-links{flex:1 0 100%;min-width:0;overflow-x:auto}
+.follow-links table{width:100%;min-width:630px;border-collapse:collapse;font-size:11px;text-align:left}
+.follow-links td,.follow-links th{padding:8px 7px;border-bottom:1px solid var(--line);vertical-align:top}
+.follow-links th{font-weight:650;white-space:nowrap}
+.follow-links td:nth-child(3),.follow-links td:nth-child(4){font-variant-numeric:tabular-nums;white-space:nowrap}
+.follow-links td a{font-weight:550;text-decoration:underline;text-underline-offset:2px}
